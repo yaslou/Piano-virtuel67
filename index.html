@@ -8,8 +8,9 @@
 :root{--bg:#0d0f1e;--panel:#161932;--panel2:#20244a;--line:#2d3263;--text:#eef0ff;--muted:#9aa1d0;--accent:#6c8cff;--ok:#38e08c;--bad:#ff5d73}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
-#app{display:flex;flex-direction:column;height:100%}
-#bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#app{position:relative;height:100%}
+#bar{position:absolute;top:0;left:0;right:0;z-index:8;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 12px;background:rgba(22,25,50,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);transition:transform .3s,opacity .3s}
+#bar.hide{transform:translateY(-105%);opacity:0;pointer-events:none}
 #bar label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
 #bar input[type=range]{width:90px;accent-color:var(--accent)}
 button{font:inherit;font-size:14px;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
@@ -30,9 +31,9 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff;fo
 #heard{font-size:14px;min-width:150px}
 #heard b{color:var(--text)}
 #msg{font-size:13px;color:#ffd166}
-#stageWrap{flex:1;position:relative;min-height:0}
+#stageWrap{position:absolute;inset:0}
 #stage{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
-.overlay{position:absolute;inset:0;background:rgba(8,9,20,.88);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px;z-index:5}
+.overlay{position:absolute;inset:0;background:rgba(8,9,20,.88);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px;padding-top:calc(var(--barh,0px) + 20px);z-index:5}
 .overlay.hidden{display:none}
 .box{max-width:980px;width:100%}
 .box h1{margin:0 0 6px;font-size:28px}
@@ -692,21 +693,23 @@ function draw(now){
 
     // notes qui tombent
   g.save(); g.beginPath(); g.rect(0,0,W,hitY); g.clip();
-  for(let i=0;i<notes.length;i++){
+  const lfs=Math.max(10,Math.min(14,ww*0.52));
+  for(let i=notes.length-1;i>=0;i--){
     const n=notes[i], k=KR[n.midi]; if(!k) continue;
-    const y2=hitY-(n.start-t)*ppb, y1=y2-n.dur*ppb+3;
+    const y2=hitY-(n.start-t)*ppb, hgt=Math.max(n.dur*ppb-3,17), y1=y2-hgt;
     if(y1>hitY||y2<0) continue;
     const pc=n.midi%12, isT=(events[nextIdx]&&events[nextIdx].notes.includes(n));
     const px=k.x+(k.black?1:2), pw=k.w-(k.black?2:4);
     const act=n.done&&t>=n.start&&t<n.start+n.dur;
     let fill=col(pc,n.done&&!act?0.45:1,act?72:58);
     if(act||(isT&&waiting)){ g.shadowColor=col(pc,1,65); g.shadowBlur=18; }
-    g.fillStyle=fill; rr(px,y1,pw,y2-y1,5); g.fill(); g.shadowBlur=0;
-    if(k.black||n.hand==='L'){ g.strokeStyle=n.hand==='L'?'rgba(255,255,255,.95)':'rgba(255,255,255,.85)'; g.lineWidth=n.hand==='L'?2:1.5; if(n.hand==='L') g.setLineDash([5,3]); rr(px,y1,pw,y2-y1,5); g.stroke(); g.setLineDash([]); }
-    if(y2-y1>=13){
-      const txt=NAMES[pc]; fit(txt,pw-3,13); g.fillStyle='#0b0d1c'; g.textAlign='center'; g.textBaseline='middle';
-      g.fillText(txt,px+pw/2,y2-Math.min(10,(y2-y1)/2));
-    }
+    g.fillStyle=fill; rr(px,y1,pw,hgt,5); g.fill(); g.shadowBlur=0;
+    if(k.black||n.hand==='L'){ g.strokeStyle=n.hand==='L'?'rgba(255,255,255,.95)':'rgba(255,255,255,.85)'; g.lineWidth=n.hand==='L'?2:1.5; if(n.hand==='L') g.setLineDash([5,3]); rr(px,y1,pw,hgt,5); g.stroke(); g.setLineDash([]); }
+    // nom de la note (toujours affiché, avec contour pour rester lisible)
+    const txt=NAMES[pc], ly=y2-Math.min(10,hgt/2);
+    g.font='800 '+lfs+'px system-ui,sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.lineJoin='round';
+    g.lineWidth=3.2; g.strokeStyle='rgba(8,10,25,.92)'; g.strokeText(txt,px+pw/2,ly);
+    g.fillStyle='#fff'; g.fillText(txt,px+pw/2,ly);
   }
   g.restore();
   // ligne de frappe
@@ -806,11 +809,20 @@ cv.addEventListener('pointerdown',e=>{
   if(hit==null){ const idx=Math.floor(x/ww); let c=0; for(let m=LOW;m<=HIGH;m++){ if(isBlack(m)) continue; if(c===idx){hit=m;break;} c++; } }
   if(hit!=null) screenInput(hit);
 });
-addEventListener('resize',layout);
+addEventListener('resize',()=>{ layout(); setBarH(); });
+/* barre du haut : disparaît après 5 s, revient au toucher */
+let barTimer=null;
+function setBarH(){ document.documentElement.style.setProperty('--barh',$('bar').offsetHeight+'px'); }
+function hideBar(){
+  if(!$('menu').classList.contains('hidden')||!$('result').classList.contains('hidden')){ barTimer=setTimeout(hideBar,5000); return; }
+  $('bar').classList.add('hide');
+}
+function showBar(){ $('bar').classList.remove('hide'); setBarH(); clearTimeout(barTimer); barTimer=setTimeout(hideBar,5000); }
+for(const ev of ['pointerdown','touchstart','mousemove','keydown']) addEventListener(ev,showBar,{passive:true});
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&playing) togglePlay(); });
 
 speed=parseFloat($('spd').value); $('spdV').textContent=Math.round(speed*100)+'%';
-layout(); buildMenu(); loadSong(SONGS[SONGS.length-1]); $('menu').classList.remove('hidden');
+layout(); setBarH(); showBar(); buildMenu(); loadSong(SONGS[SONGS.length-1]); $('menu').classList.remove('hidden');
 try{ ensureCtx(); }catch(e){}
 requestAnimationFrame(frame);
 
