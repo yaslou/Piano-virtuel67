@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#161932">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PianoChute">
 <title>PianoChute – apprends le piano gratuitement</title>
 <style>
 :root{--bg:#0d0f1e;--panel:#161932;--panel2:#20244a;--line:#2d3263;--text:#eef0ff;--muted:#9aa1d0;--accent:#6c8cff;--ok:#38e08c;--bad:#ff5d73}
@@ -33,7 +40,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff;fo
 #msg{font-size:13px;color:#ffd166}
 #stageWrap{position:absolute;inset:0}
 #stage{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
-.overlay{position:absolute;inset:0;background:rgba(8,9,20,.88);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px;padding-top:calc(var(--barh,0px) + 20px);z-index:5}
+.overlay{position:absolute;inset:0;background:rgba(8,9,20,.97);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px;padding-top:calc(var(--barh,0px) + 20px);z-index:5}
 .overlay.hidden{display:none}
 .box{max-width:980px;width:100%}
 .box h1{margin:0 0 6px;font-size:28px}
@@ -43,6 +50,19 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff;fo
 .card:hover{border-color:var(--accent);transform:translateY(-1px)}
 .card h3{margin:0 0 4px;font-size:16px}
 .card .by{color:var(--muted);font-size:13px}
+.srow{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 10px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:16px;cursor:pointer;text-align:left;color:var(--text)}
+.srow:hover{border-color:var(--accent);background:var(--panel2)}
+.srow .stxt{flex:1;min-width:0}
+.srow h3{margin:0 0 3px;font-size:17px}
+.srow .by{color:var(--muted);font-size:13px}
+.sicon{flex:none;width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:inset 0 -4px 0 rgba(0,0,0,.18),0 2px 8px rgba(0,0,0,.35)}
+.sicon.sm{width:46px;height:46px;font-size:24px;border-radius:12px}
+.stars{color:#ffd166;letter-spacing:2px;font-size:15px;white-space:nowrap}
+.stars i{color:#3a3f6b;font-style:normal}
+.srow.full{border-color:#ffd166;background:linear-gradient(90deg,rgba(255,209,102,.12),transparent)}
+.pnum{flex:none;width:34px;height:34px;border-radius:50%;background:#0d0f1e;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700}
+.back{margin:4px 0 14px}
+.sec{color:var(--muted);font-size:13px;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.08em}
 .tag{display:inline-block;margin-top:8px;font-size:11px;padding:2px 8px;border-radius:99px;background:#0d0f1e;border:1px solid var(--line)}
 .tag.Facile{color:var(--ok)}.tag.Moyen{color:#ffd166}.tag.Difficile{color:var(--bad)}
 #result .box{text-align:center;margin-top:8vh}
@@ -77,11 +97,11 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff;fo
     <canvas id="stage"></canvas>
     <div id="menu" class="overlay">
       <div class="box">
-        <h1>🎹 PianoChute</h1>
+        <div id="intro"><h1>🎹 PianoChute</h1>
         <p>Apprends le piano gratuitement : les notes tombent sur un clavier de 61 touches avec leur nom (Do, Ré, Mi…).
         Place ton vrai piano devant l'ordinateur ou le téléphone, autorise le micro, et joue : l'appli <b>écoute</b>. Si tu joues la bonne touche, ça continue ; sinon, les notes <b>s'arrêtent</b> et attendent.</p>
-        <p>Astuce : tu peux aussi cliquer sur les touches à l'écran. Raccourcis : <b>Espace</b> pause, <b>→</b> passer la note, <b>R</b> recommencer.</p>
-        <div class="grid" id="songGrid"></div>
+        <p>Astuce : tu peux aussi cliquer sur les touches à l'écran. Raccourcis : <b>Espace</b> pause, <b>→</b> passer la note, <b>R</b> recommencer.</p></div>
+        <div id="songGrid"></div>
       </div>
     </div>
     <div id="result" class="overlay hidden">
@@ -89,7 +109,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff;fo
         <div id="stars"></div>
         <h1 id="resTitle">Bravo !</h1>
         <p id="resTxt"></p>
-        <div class="row"><button id="btnAgain" class="primary">Rejouer</button><button id="btnOther">Autres chansons</button></div>
+        <div class="row"><button id="btnAgain">Rejouer</button><button id="btnNext" class="primary">Partie suivante ▶</button><button id="btnOther">Retour à la chanson</button></div>
       </div>
     </div>
   </div>
@@ -163,6 +183,8 @@ const SONGS=[
   lh:["D3:.5 F3+A3:.5 D3:.5 A3+D4:.5 D3:.5 F3+A3:.5 D3:.5 D2:.5 D3:.5 F3+A3:.5 D3:.5 A3+D4:.5 D3:.5 F3+A3:.5 D3:.5 D2:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 G2:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 C2:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 F2:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 A2:.5 A3:.5 R:3.0 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 G2:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 C2:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 F2:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 A2:.5 A3:.5 R:3.0 D3+F3:1 E3+G3:1 D3+F3:2 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D2:.75 A2+D3:.25 F2:.75 A2+D3:.25 D2:.75 A2+D3:.25 E2+E3:.5 F2+F3:.5 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D3:.5 A3:.5 D4:.5 F4:.5 R:2.0 D3:.5 F3+A3:.5 D3:.5 A3+D4:.5 D3:.5 F3+A3:.5 D3:.5 D2:.5 D3:.5 F3+A3:.5 D3:.5 A3+D4:.5 D3:.5 F3+A3:.5 D3:.5 D2:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 G2:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 C2:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 F2:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 A2:.5 C#3:.5 E3:.5 G3:.5 C#4:2 D3+F3:1 E3+G3:1 D3+F3:2 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D2:.75 A2+D3:.25 F2:.75 A2+D3:.25 D2:.75 A2+D3:.25 E2+E3:.5 F2+F3:.5 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D2:.75 A2+D3:.25 F2:.75 A2+D3:.25 D2:.75 A2+D3:.25 E2+E3:.5 F2+F3:.5 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D2:.75 A2+D3:.25 F2:.75 A2+D3:.25 D2:.75 A2+D3:.25 E2+E3:.5 F2+F3:.5 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D3:.5 D3:.5", "R:110.0 G2:1 R:7.0 F2:1"],data:["E4+G4:.5 R:0.5 F4+A4:.5 R:0.5 E4+G4:.5 R:1.5 E4+G4:.5 R:0.5 F4+A4:.5 R:0.5 E4+G4:.5 R:1.5 A5:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 A4:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 Bb5:1.5 A5:.25 G5:.25 F5:.5 E5:.5 F5:.5 G5:.5 C5:1.5 G5:.25 E5:.25 Bb5:.5 C5:.5 E5:.5 Bb5:.5 A5:3 F4:.5 G4:.5 A4:4 A5:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 A4:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 Bb5:1.5 A5:.25 G5:.25 F5:.5 E5:.5 F5:.5 G5:.5 C5:1.5 G5:.25 E5:.25 Bb5:.5 C5:.5 E5:.5 Bb5:.5 A5:3 F4:.5 G4:.5 A4:4 D5:1 E5:1 F5:2 Bb5:.75 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 E5:.5 D5:.25 C#5:.25 D5:.25 E5:.25 F5:1 D5:.5 E5:.5 F5:.5 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 F4+A4+E5:.5 F4+A4+D5:.5 R:1.0 A4:.5 D5:.5 F5:.5 D6:.5 E4+G4:.5 R:0.5 F4+A4:.5 R:0.5 E4+G4:.5 R:1.5 E4+G4:.5 R:0.5 F4+A4:.5 R:0.5 E4+G4:.5 R:1.5 A5:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 A4:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 Bb5:1.5 A5:.25 G5:.25 F5:.5 E5:.5 F5:.5 G5:.5 C5:1.5 G5:.25 E5:.25 Bb5:.5 C5:.5 E5:.5 Bb5:.5 A5:3 F4:.5 G4:.5 A4:4 D5:1 E5:1 F5:2 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 E5:.5 D5:.25 C#5:.25 D5:.25 E5:.25 F5:1 D5:.5 E5:.5 F5:.5 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 E5:.5 D5:.25 C#5:.25 D5:.25 E5:.25 F5:1 D5:.5 E5:.5 F5:.5 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 E5:.5 D5:.25 C#5:.25 D5:.25 E5:.25 F5:1 D5:.5 E5:.5 F5:.5 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 F5:.5 E5:.5 D5:.5 C#5:1 D5:1 F4+A4+E5:.5 F4+A4+D5:.5", "R:29.0 E4:.5 A4:.5 C#5:.5 E5:.5 G5:.5 A5:.5 R:21.0 E4:.5 A4:.5 C#5:.5 E5:.5 G5:.5 A5:.5 R:65.0 A4:1 B4:1 C#5:1"]},
  {title:'Tourner dans le vide',by:'Indila — partition piano (Top G)',level:'Difficile',bpm:120,bar:4,
   lh:"B3+D4+F#4:2 B3+D4+F#4:2 A3+C#4+E4:2 A3+C#4+E4:2 G#3+B3+D#4:2 G#3+B3+D#4:2 C#4+F4+G#4:2 C#4+F4+G#4:2 B3+D4+F#4:2 B3+D4+F#4:2 A3+C#4+E4:2 A3+C#4+E4:2 G#3+B3+D#4:2 G#3+B3+D#4:2 C#4+F4+G#4:2 C#4+F4+G#4:2 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4",data:"G#5:.5 D6:.5 D6:.5 D6:.5 G#5:.5 D6:.5 D6:.5 D6:.5 F#5:.5 D6:.5 D6:.5 D6:.5 F#5:.5 D6:.5 D6:.5 D6:.5 E5:.5 D6:.5 D6:.5 D6:.5 E5:.5 D6:.5 D6:.5 D6:.5 E6:.5 A5:.5 G#5:.5 A5:.5 E6:.5 A5:.5 G#5:.5 A5:.5 G#5:.5 D6:.5 D6:.5 D6:.5 G#5:.5 D6:.5 D6:.5 D6:.5 F#5:.5 D6:.5 D6:.5 D6:.5 F#5:.5 D6:.5 D6:.5 D6:.5 E5:.5 D6:.5 D6:.5 D6:.5 E5:.5 D6:.5 D6:.5 D6:.5 E6:.5 A5:.5 G#5:.5 A5:.5 E6:.5 A5:.5 G#5:.5 A5:.5 C#5:1 B4:.5 C#5:.5 B4:1.5 R:.5 B4:.5 B4:1 A4:.25 B4:.25 A4:1.5 R:.5 G#4:.5 A4:.5 G#4:.5 A4:.5 B4:1.5 R:.5 A4:.5 G#4:.5 F#4:.5 A4:.25 A4:.25 G#4:1.5 R:.5 C#5:.5 B4:.5 C#5:.5 D5:.5 D5:1.5 D5:.5 G#5:.5 A5:.5 G#5:.5 F#5:.5 C#5:1.5 R:.5 C#5:.25 C#5:.25 B4:.5 C#5:.5 B4:2 A4:.5 C#5:.5 D5:.5 C#5:.5 D5:.5 C#5:1.5 R:.5 R:1 C#5:.5 B4:.5 C#5:.5 B4:1 A4:.5 A4:4 R:.5 B4:.5 A4:.5 B4:.5 A4:1.5 G#4:2 C#5:1.5 E5:.5 C#5:.5 D5:2 R:.5 A5:.5 G#5:.5 F#5:.5 C#5:3 R:.5 B4:.5 C#5:.75 D5:.75 C#5:.25 D5:.25 C#5:1 C#5:1 C#5:.5 D5:.5 C#5:1.5 B4:.5 D5:.5 C#5:1 D5:.5 D5:.5 D5:.5 F#5:2 C#5:.5 C#5:.25 C#5:.25 C#5:.5 C#5:.5 F#5:2 D5:.5 C#5:.5 B4:.5 C#5:.5 D5:.5 D5:.75 D5:.25 G#5:.25 F#5:.25 A5:1.5 G#5:.5 G#5:1 F#5:1 R:.5 D5:.5 D5:.5 D5:.5 F#5:2 C#5:.5 C#5:.25 C#5:.25 C#5:.5 C#5:.5 F#5:1.5 D5:.5 C#5:.5 D5:.5 C#5:.5 D5:.5 C#5:1 D5:1/3 C#5:1/3 D5:1/3 C#5:1.5 C#5:.5 D5:1 D5:1 D5:.5 D5:.5 D5:.5 F#5:.5 F#5:.5 F#5:.5 G#5:.5 F#5:.5 C#5:.5 C#5:.5 C#5:.5 F#5:.5 F#5:.5 F#5:.5 G#5:.5 F#5:.5 D5:.5 D5:.5 D5:.5 F#5:.5 F#5:.5 F#5:1 G#5:.25 F#5:.25 G#5:2 G#5:1 F#5:.5 G#5:.5 D5:.5 D5:.5 D5:.5 F#5:.5 F#5:.5 F#5:.5 G#5:.5 F#5:.5 C#5:.5 C#5:.5 C#5:.5 F#5:.5 F#5:.5 F#5:.5 G#5:.5 F#5:.5 D5:.5 D5:.5 D5:.5 F#5:.5 F#5:.5 F#5:1 G#5:.25 F#5:.25 A5:2 G#5:2 C#5:.5 B4:.5 C#5:.5 B4:2.5 B4:.5 A4:.5 B4:.5 A4:2.5 C#5:.5 B4:.5 C#5:.5 B4:2.5 G#4:.5 A4:.5 G#4:.5 A4:.5 B4:2 C#5:.5 B4:.5 C#5:.5 B4:2.5 B4:.5 A4:.5 B4:.5 A4:2.5 G#4:.5 A4:.5 G#4:.5 A4:.5 G#4:2 C#5:4 C#5:1 C#5:.25 B4:.25 B4:.25 C#5:.25 B4:1.5 A4:.5 B4:1.5 A4:.25 B4:.25 A4:1.5 A4:.5 G#4:1 A4:.5 G#4:.5 A4:.5 B4:1 A4:.5 G#4:1 F#4:.25 G#4:.25 A4:.5 G#4:1 F#4:1 R:.5 D5:.25 C#5:.25 B4:.5 C#5:.5 D5:1.5 D5:.25 D5:.25 G#5:.5 A5:.5 G#5:.5 F#5:.5 C#5:2 R:.5 C#5:.25 C#5:.25 C#5:.5 B4:.25 C#5:.25 B4:1.5 A4:.25 A4:.25 C#5:1 D5:.5 C#5:.25 D5:.25 C#5:2 R:1.25 C#5:.25 B4:.25 C#5:.25 B4:1.5 A4:.5 A4:4 R:.5 B4:.5 A4:.5 B4:.5 A4:1.5 G#4:1.5 C#5:2 E5:.5 C#5:.5 D5:2 R:.5 A5:.5 G#5:.5 F#5:.5 C#5:3 R:.5 B4:.5 C#5:.5 D5:.5 C#5:.5 D5:.5 C#5:.75 D5:.75 C#5:.25 D5:.25 C#5:1.5 B4:.5 D5:1 C#5:1 D5:.5 D5:.5 D5:.5 D5:.5 F#5:2"},
+ {title:'Experience',by:'Ludovico Einaudi — partition complète, avec reprises',level:'Difficile',bpm:84,bar:4,unit:.25,
+  lh:["F#3:2 C#4:2 F#4:2 C#4:2 F#3:2 C#4:2 F#4:2 C#4:2 A3:2 E4:2 A4:2 E4:2 A3:2 E4:2 A4:2 E4:2 C#3:2 G#3:2 E4:2 G#3:2 C#3:2 G#3:2 E4:2 G#3:2 D3:2 A3:2 F#4:2 A3:2 D3:2 A3:2 F#4:2 A3:2 F#3:2 C#4:2 F#4:2 C#4:2 F#3:2 C#4:2 F#4:2 C#4:2 A3:2 E4:2 A4:2 E4:2 A3:2 E4:2 A4:2 E4:2 C#3:2 G#3:2 E4:2 G#3:2 C#3:2 G#3:2 E4:2 G#3:2 D3:2 A3:2 F#4:2 A3:2 D3:2 A3:2 F#3:12 F#3:16 A3:16 C#3:16 D3:16 F#3:16 A3:16 C#3:16 D3:16 F#2+C#3+A3:16 A2+E3+A3:16 C#3+E3+G#3:16 D3+F#3+A3:16 F#2+C#3+A3:16 A2+E3+A3:16 C#3+E3+G#3:16 D3+F#3+A3:16 F#2+C#3+A3:16 A2+E3+A3:16 C#3+E3+G#3:16 D3+F#3+A3:16 F#2+C#3+A3:16 A2+E3+A3:16 C#3+E3+G#3:16 D3+F#3+A3:16 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#3:1 E3:1 G#3:1 E3:1 C#3:1 E3:1 G#3:1 E3:1 C#3:1 E3:1 G#3:1 E3:1 C#3:1 E3:1 G#3:1 E3:1 D3:1 F#3:1 A3:1 F#3:1 D3:1 F#3:1 A3:1 F#3:1 D3:1 F#3:1 A3:1 F#3:1 D3:1 F#3:1 A3:1 F#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#3:1 E3:1 G#3:1 E3:1 C#3:1 E3:1 G#3:1 E3:1 C#3:1 E3:1 G#3:1 E3:1 C#3:1 E3:1 G#3:1 E3:1 D3:1 F#3:1 A3:1 F#3:1 D3:1 F#3:1 A3:1 F#3:1 D3:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2+C#3:16 A2+E3:16 C#3+G#3:16 D3+A3:16 F#2+C#3+A3:16 A2+E3+A3:16 C#3+E3+G#3:16 D3+F#3+A3:16 F#2+C#3:16 A2+E3:16 C#3+G#3:16 D3+F#3+A3:16 F#2+C#3+A3:16 A2+E3+A3:16 C#3+E3+G#3:16 D3+F#3+A3:16 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 D3:1 A2:1 D2:1 A2:1 D3:1 A2:1 D2:1 A2:1 D3:1 A2:1 D2:1 A2:1 D3:1 A2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:16 A2:16 C#3:16 D3+F#3:8 D3:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:16 A2:16 C#3:16 D3+F#3:8 D3:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 F#3:1 E3:1 D3:1 C#3:1 B2:1 A2:1 G#2:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 F#2:1 C#3:1 A3:1 C#3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 A2:1 E3:1 A3:1 E3:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 C#2:1 G#2:1 E3:1 G#2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:1 D2:1 A2:1 F#3:1 A2:17:1 F#3:2 C#4:2 F#4:2 C#4:2 F#3:2 C#4:2 F#4:2 C#4:2 A3:2 E4:2 A4:2 E4:2 A3:2 E4:2 A4:2 E4:2 C#3:2 G#3:2 E4:2 G#3:2 C#3:2 G#3:2 E4:2 G#3:2 D3:2 A3:2 F#4:2 A3:2 D3:2 A3:2 F#4:12 F#3:2 C#4:2 F#4:2 C#4:2 F#3:2 C#4:2 F#4:2 C#4:2 A3:2 E4:2 A4:2 E4:2 A3:2 E4:2 A4:2 E4:2 C#3:2 G#3:2 E4:2 G#3:2 C#3:2 G#3:2 E4:2 G#3:2 D3:2 A3:2 F#4:2 A3:2 D3:2 A3:2 F#4:12", "R:1288 R:4 C#3:4 A3:4 C#3:4 A3:4 E3:4 A3:4 E3:4 G#3:4 E3:4 G#3:4 E3:4 R:4 C#3:4 A3:4 C#3:4 A3:4 E3:4 A3:4 E3:4 G#3:4 E3:4 G#3:4 E3:4"],data:"C#5:4 C#5:4 D5:4 C#5:4 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 B4:4 C#5:4 D5:4 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 B4:4 A4:4 B4:12 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 A4:1 D4:1 A4:1 B4:1 A4:1 D4:1 A4:1 C#5:1 A4:1 D4:1 A4:1 D5:1 A4:1 D4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 A4:1 D4:1 A4:1 B4:1 A4:1 D4:1 A4:1 C#5:1 A4:1 D4:1 A4:1 D5:1 A4:1 D4:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 D4:1 G#4:1 F#4:1 A4:1 D4:1 G#4:1 F#4:1 A4:1 D4:1 G#4:1 F#4:1 A4:1 D4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 D4:1 G#4:1 F#4:1 A4:1 D4:1 G#4:1 F#4:1 A4:1 D4:1 G#4:1 F#4:1 A4:1 D4:1 G#4:1 F#4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 C#4:1 B4:1 A4:1 C#5:1 D4:1 B4:1 A4:1 C#5:1 D4:1 B4:1 A4:1 C#5:1 D4:1 B4:1 A4:1 C#5:1 D4:1 B4:1 A4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 A4:1 C#4:1 G#4:1 F#4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 D5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 D5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 D5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 F#4:1 D4:1 F#4:1 B4:1 F#4:1 D4:1 F#4:1 C#5:1 F#4:1 D4:1 F#4:1 D5:1 F#4:1 D4:1 F#4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 D5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 D5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 D5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 F#4:1 D4:1 F#4:1 B4:1 F#4:1 D4:1 F#4:1 C#5:1 F#4:1 D4:1 F#4:1 D5:1 F#4:1 D4:1 F#4:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 D6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 F#5:1 D5:1 F#5:1 B5:1 F#5:1 D5:1 F#5:1 C#6:1 F#5:1 D5:1 F#5:1 D6:1 F#5:1 D5:1 F#5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 D6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 F#5:1 D5:1 F#5:1 B5:1 F#5:1 D5:1 F#5:1 C#6:1 F#5:1 D5:1 F#5:1 D6:1 F#5:1 D5:1 F#5:1 A4:2 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:2 C#4:2 A4:2 D4:2 A4:2 C#4:2 A4:2 D4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:1 G#4:1 C#4:2 A4:2 C#4:2 A4:2 D4:2 A4:2 C#4:2 A4:2 D4:2 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 G#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 C#4:1 C#5:1 C#4:1 A4:1 F#5:1 E5:1 D5:1 C#5:1 B4:1 A4:1 G#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 G#4:1 F#4:1 C#4:1 F#4:1 G#4:1 F#4:1 C#4:1 F#4:1 G#4:1 F#4:1 C#4:1 F#4:1 G#4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 G#4:1 F#4:1 C#4:1 F#4:1 G#4:1 F#4:1 C#4:1 F#4:1 G#4:1 F#4:1 C#4:1 F#4:1 G#4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 A4:1 F#4:1 C#4:1 F#4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 D5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 D5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 D5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 F#4:1 D4:1 F#4:1 B4:1 F#4:1 D4:1 F#4:1 C#5:1 F#4:1 D4:1 F#4:1 D5:1 F#4:1 D4:1 F#4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 D5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 D5:1 A4:1 C#4:1 A4:1 C#5:1 A4:1 C#4:1 A4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 D5:1 G#4:1 C#4:1 G#4:1 C#5:1 G#4:1 C#4:1 G#4:1 C#5:1 F#4:1 D4:1 F#4:1 B4:1 F#4:1 D4:1 F#4:1 C#5:1 F#4:1 D4:1 F#4:1 D5:1 F#4:1 D4:1 F#4:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 D6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 F#5:1 D5:1 F#5:1 B5:1 F#5:1 D5:1 F#5:1 C#6:1 F#5:1 D5:1 F#5:1 D6:1 F#5:1 D5:1 F#5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 D6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 F#5:1 D5:1 F#5:1 B5:1 F#5:1 D5:1 F#5:1 C#6:1 F#5:1 D5:1 F#5:1 D6:1 F#5:1 D5:1 F#5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 D6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 F#5:1 D5:1 F#5:1 B5:1 F#5:1 D5:1 F#5:1 C#6:1 F#5:1 D5:1 F#5:1 D6:1 F#5:1 D5:1 F#5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 D6:1 A5:1 C#5:1 A5:1 C#6:1 A5:1 C#5:1 A5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 D6:1 G#5:1 C#5:1 G#5:1 C#6:1 G#5:1 C#5:1 G#5:1 C#6:1 F#5:1 D5:1 F#5:1 B5:1 F#5:1 D5:1 F#5:1 C#6:1 F#5:1 E5:1 D5:1 C#5:1 B4:1 A4:1 G#4:17:1 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 B4:4 A4:4 B4:12 C#5:4 C#5:4 D5:4 C#5:2 A4:1 B4:1 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 C#5:4 D5:4 C#5:4 C#5:4 B4:4 C#5:4 D5:12"},
  {title:'Lettre à Élise',by:'Beethoven — partition complète',level:'Difficile',bpm:66,bar:1.5,
   unit:.25,lh:"R:2 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:1 R:2 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 C3:1 G3:1 C4:1 R:3 G2:1 G3:1 B3:1 R:3 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 E4:1 R:2 E4:1 E5:1 R:2 D#5:1 E5:1 R:1 R:1 D#5:1 E5:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 C3:1 G3:1 C4:1 R:3 G2:1 G3:1 B3:1 R:3 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 E4:1 R:2 E4:1 E5:1 R:2 D#5:1 E5:1 R:1 R:1 D#5:1 E5:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 Bb3+C4:1 A3+C4:1 G3+Bb3+C4:1 F3:1 A3:1 C4:1 A3:1 C4:1 A3:1 F3:1 Bb3:1 D4:1 Bb3:1 D4:1 Bb3:1 F3:1 E4:1 G3+Bb3:1 E4:1 G3+Bb3:1 E4:1 F3:1 A3:1 C4:1 A3:1 C4:1 A3:1 F3:1 A3:1 C4:1 A3:1 C4:1 A3:1 E3:1 A3:1 C4:1 A3:1 D3+D4:1 F3:1 G3:1 E4:1 G3:1 E4:1 G3:1 F4:1 C4+E4+G4:2 R:1 F4+G4:1 E4+G4:1 D4+F4+G4:1 C4+E4+G4:2 F3+A3:2 G3+B3:2 C4:2 R:1 F4+G4:1 E4+G4:1 D4+F4+G4:1 C4+E4+G4:2 F3+A3:2 G3+B3:2 G#3+B3+E4:2 R:4 R:6 R:6 R:6 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 C3:1 G3:1 C4:1 R:3 G2:1 G3:1 B3:1 R:3 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 E4:1 R:2 E4:1 E5:1 R:2 D#5:1 E5:1 R:1 R:1 D#5:1 E5:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 D2+A2:1 D2+A2:1 D2+A2:1 D2+A2:1 D2+A2:1 D2+A2:1 D#2+A2:1 D#2+A2:1 D#2+A2:1 D#2+A2:1 D#2+A2:1 D#2+A2:1 E2+A2:1 E2+A2:1 E2+A2:1 E2+A2:1 E2+G#2:1 E2+G#2:1 A1+A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 B2:1 B2:1 B2:1 B2:1 B2:1 B2:1 C3:4 R:2 E3+G#3+B3:2 R:4 A1:2 R:2 A3+C4+E4:2 A3+C4+E4:2 R:2 A3+C4+E4:2 A3+C4+E4:2 R:2 A3+C4+E4:2 A3+C4+E4:2 R:4 R:6 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 C3:1 G3:1 C4:1 R:3 G2:1 G3:1 B3:1 R:3 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 E4:1 R:2 E4:1 E5:1 R:2 D#5:1 E5:1 R:1 R:1 D#5:1 E5:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A1:2 R:4",data:"E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:4 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 B4:1 C5:1 D5:1 E5:3 G4:1 F5:1 E5:1 D5:3 F4:1 E5:1 D5:1 C5:3 E4:1 D5:1 C5:1 B4:2 R:1 E4:1 E5:1 R:1 R:1 E5:1 E6:1 R:2 D#5:1 E5:1 R:2 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 B4:1 C5:1 D5:1 E5:3 G4:1 F5:1 E5:1 D5:3 F4:1 E5:1 D5:1 C5:3 E4:1 D5:1 C5:1 B4:2 R:1 E4:1 E5:1 R:1 R:1 E5:1 E6:1 R:2 D#5:1 E5:1 R:2 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 E4+C5:1 F4+C5:1 E4+G4+C5:1 F4:.5 A4:.5 C5:3 F5:1.5 E5:.5 E5:2 D5:2 Bb5:1.5 A5:.5 A5:1 G5:1 F5:1 E5:1 D5:1 C5:1 Bb4:2 A4:1.75 Bb4:.25 A4:.5 G4:.5 A4:.5 Bb4:.5 C5:4 D5:1 D#5:1 E5:3 E5:1 F5:1 A4:1 C5:4 D5:1.5 B4:.5 C5:.5 G5:.5 G4:.5 G5:.5 A4:.5 G5:.5 B4:.5 G5:.5 C5:.5 G5:.5 D5:.5 G5:.5 E5:.5 G5:.5 C6:.5 B5:.5 A5:.5 G5:.5 F5:.5 E5:.5 D5:.5 G5:.5 F5:.5 D5:.5 C5:.5 G5:.5 G4:.5 G5:.5 A4:.5 G5:.5 B4:.5 G5:.5 C5:.5 G5:.5 D5:.5 G5:.5 E5:.5 G5:.5 C6:.5 B5:.5 A5:.5 G5:.5 F5:.5 E5:.5 D5:.5 G5:.5 F5:.5 D5:.5 E5:.5 F5:.5 E5:.5 D#5:.5 E5:.5 B4:.5 E5:.5 D#5:.5 E5:.5 B4:.5 E5:.5 D#5:.5 E5:3 B4:1 E5:1 D#5:1 E5:3 B4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 B4:1 C5:1 D5:1 E5:3 G4:1 F5:1 E5:1 D5:3 F4:1 E5:1 D5:1 C5:3 E4:1 D5:1 C5:1 B4:2 R:1 E4:1 E5:1 R:1 R:1 E5:1 E6:1 R:2 D#5:1 E5:1 R:2 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:4 E4+G4+Bb4+C#5:6 F4+A4+D5:4 C#5+E5:1 D5+F5:1 G#4+D5+F5:4 G4+D5+F5:2 A4+C5+E5:6 F4+D5:4 E4+C5:1 D4+B4:1 C4+F#4+A4:4 C4+A4:2 C4+A4:2 E4+C5:2 D4+B4:2 C4+A4:6 E4+G4+Bb4+C#5:6 F4+A4+D5:4 C#5+E5:1 D5+F5:1 D5+F5:4 D5+F5:2 D5+F5:6 G4+Eb5:4 F4+D5:1 Eb4+C5:1 D4+F4+Bb4:4 D4+F4+A4:2 D4+F4+G#4:4 D4+F4+G#4:2 C4+E4+G4:4 R:2 E4+B4:2 R:4 A3:2/3 C4:2/3 E4:2/3 A4:2/3 C5:2/3 E5:2/3 D5:2/3 C5:2/3 B4:2/3 A4:2/3 C5:2/3 E5:2/3 A5:2/3 C6:2/3 E6:2/3 D6:2/3 C6:2/3 B5:2/3 A5:2/3 C6:2/3 E6:2/3 A6:2/3 C7:2/3 E7:2/3 D7:2/3 C7:2/3 B6:2/3 A#6:2/3 A6:2/3 G#6:2/3 G6:2/3 F#6:2/3 F6:2/3 E6:2/3 D#6:2/3 D6:2/3 C#6:2/3 C6:2/3 B5:2/3 A#5:2/3 A5:2/3 G#5:2/3 G5:2/3 F#5:2/3 F5:2/3 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 B4:1 C5:1 D5:1 E5:3 G4:1 F5:1 E5:1 D5:3 F4:1 E5:1 D5:1 C5:3 E4:1 D5:1 C5:1 B4:2 R:1 E4:1 E5:1 R:1 R:1 E5:1 E6:1 R:2 D#5:1 E5:1 R:2 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:4"}
 ];
@@ -191,17 +213,23 @@ const BUF=16384, tmp=new Float32Array(BUF);
 /* Vrai piano à queue : échantillons Salamander Grand Piano (CC-BY, A. Salamander), dossier piano/ */
 let pianoSamples=null, pianoLoading=false;
 const SAMPLE_NAMES={33:'A1',36:'C2',39:'Ds2',42:'Fs2',45:'A2',48:'C3',51:'Ds3',54:'Fs3',57:'A3',60:'C4',63:'Ds4',66:'Fs4',69:'A4',72:'C5',75:'Ds5',78:'Fs5',81:'A5',84:'C6',87:'Ds6',90:'Fs6',93:'A6',96:'C7'};
-function setPianoSt(ok){ const e=document.getElementById('pstat'); if(e) e.textContent=ok?'🎹 Piano réel prêt':'🎹 Son synthétisé'; }
+function setPianoSt(ok){ const e=document.getElementById('pstat'); if(e) e.textContent=ok===null?'🎹 Chargement du piano…':ok?'🎹 Piano réel prêt':'🎹 Son synthétisé (piano non chargé)'; }
+let pianoFailed=false;
 async function loadPiano(){
-  if(pianoSamples||pianoLoading) return; pianoLoading=true;
-  try{
-    const out={};
-    await Promise.all(Object.entries(SAMPLE_NAMES).map(async([m,n])=>{
-      const r=await fetch('piano/'+n+'.mp3'); if(!r.ok) throw new Error(n);
-      out[m]=await ctx.decodeAudioData(await r.arrayBuffer());
-    }));
-    pianoSamples=out; setPianoSt(true);
-  }catch(e){ setPianoSt(false); setMsg('Piano réel indisponible : ouvre la page via http://localhost:8765 (serveur local). Son synthétisé en attendant.'); }
+  if(pianoSamples||pianoLoading) return; pianoLoading=true; pianoFailed=false; setPianoSt(null);
+  const out={}, entries=Object.entries(SAMPLE_NAMES);
+  const one=async([m,n])=>{
+    for(let k=0;k<8;k++){ try{
+      const r=await fetch('piano/'+n+'.mp3',{cache:'force-cache'}); if(!r.ok) throw new Error(n+' '+r.status);
+      out[m]=await ctx.decodeAudioData(await r.arrayBuffer()); return true;
+    }catch(e){ await new Promise(r=>setTimeout(r,300*(k+1))); } }
+    return false;
+  };
+  // 4 fichiers à la fois (un petit serveur local coupe les connexions s'il en reçoit 22 d'un coup)
+  let i=0; const workers=Array.from({length:4},async()=>{ while(i<entries.length){ const e=entries[i++]; await one(e); } });
+  await Promise.all(workers);
+  if(entries.every(([m])=>out[m])){ pianoSamples=out; setPianoSt(true); setMsg(''); }
+  else { pianoFailed=true; setPianoSt(false); setMsg('Piano réel indisponible : ouvre la page via http://localhost:8766 ou ton site GitHub (pas en double-cliquant sur le fichier).'); }
   pianoLoading=false;
 }
 function samplePlay(midi,dur,when){
@@ -221,7 +249,7 @@ function makeIR(c,sec,decay){
   return b;
 }
 function ensureCtx(){
-  if(ctx){ if(ctx.state==='suspended') ctx.resume(); return; }
+  if(ctx){ if(ctx.state!=='running') ctx.resume().catch(()=>{}); return; }
   ctx=new (window.AudioContext||window.webkitAudioContext)();
   master=ctx.createGain(); master.gain.value=0.7;
   const comp=ctx.createDynamicsCompressor(); comp.threshold.value=-20; comp.ratio.value=3.5; comp.attack.value=0.005; comp.release.value=0.25;
@@ -238,6 +266,7 @@ function ensureCtx(){
 function synth(midi,dur,when){
   ensureCtx();
   if(pianoSamples) return samplePlay(midi,dur,when);
+  if(pianoLoading||!pianoFailed){ if(!pianoLoading) loadPiano(); return; }   // on patiente : pas de son synthétisé
   return synthFallback(midi,dur,when);
 }
 function synthFallback(midi,dur,when){
@@ -429,14 +458,28 @@ function skipNote(){
 }
 
 /* ---------- Jeu ---------- */
-function loadSong(s){
-  song=s; notes=songNotes(s).map(n=>({...n,done:false})); events=makeEvents(notes); nextIdx=0; demoIdx=0; buildHands();
+/* ---- découpage en parties d'entraînement ---- */
+function partsOf(s){
+  const totalBars=Math.ceil(s.end/s.bar-1e-6); if(totalBars<=8) return [];
+  const n=Math.max(2,Math.min(12,Math.round(totalBars/8))), bpp=Math.ceil(totalBars/n), out=[];
+  for(let i=0;i*bpp<totalBars;i++) out.push({i,a:i*bpp*s.bar,b:Math.min((i+1)*bpp*s.bar,Infinity),bar0:i*bpp+1,bar1:Math.min((i+1)*bpp,totalBars)});
+  out.forEach(q=>q.n=out.length); return out;
+}
+let baseSong=null, curRange=null;
+function loadSong(s,rng){
+  baseSong=s; curRange=rng||null;
+  let ns=songNotes(s);
+  if(rng) ns=ns.filter(n=>n.start>=rng.a-1e-6&&n.start<rng.b-1e-6).map(n=>({...n,start:Math.round((n.start-rng.a)*1e6)/1e6}));
+  notes=ns.map(n=>({...n,done:false}));
+  const end=notes.length?Math.max(...notes.map(n=>n.start+n.dur)):s.end;
+  song=rng?{...s,end}:s;
+  events=makeEvents(notes); nextIdx=0; demoIdx=0; buildHands();
   t=-2; playing=false; waiting=false; stats={total:0,ontime:0,skipped:0}; lastAcc={midi:-1,time:-1};
-  $('songTitle').innerHTML=s.title+' <small>— '+s.by+'</small>';
+  $('songTitle').innerHTML=s.title+' <small>— '+(rng?'Partie '+(rng.i+1)+'/'+rng.n+' · mesures '+rng.bar0+'–'+rng.bar1:'chanson complète')+'</small>';
   $('btnPlay').textContent='▶ Jouer'; $('result').classList.add('hidden');
   $('handsSeg').style.display=s.lh?'':'none';
 }
-function restart(){ loadSong(song); }
+function restart(){ loadSong(baseSong||song,curRange); }
 async function togglePlay(){
   $('menu').classList.add('hidden'); $('result').classList.add('hidden');
   if(!playing){
@@ -454,8 +497,12 @@ function finish(){
   playing=false; $('btnPlay').textContent='▶ Jouer';
   if(mode!=='learn'){ return; }
   const pct=stats.total?Math.round(100*stats.ontime/stats.total):0;
-  $('stars').textContent=pct>=85?'★★★':pct>=55?'★★☆':'★☆☆';
-  $('resTitle').textContent='Bravo ! '+song.title+' terminé';
+  const st=pct>=85?3:pct>=55?2:1; saveStars(baseSong,curRange,st);
+  $('stars').textContent='★'.repeat(st)+'☆'.repeat(3-st);
+  const ps=partsOf(baseSong);
+  $('btnNext').style.display=curRange?'':'none';
+  $('btnNext').textContent=curRange&&curRange.i<ps.length-1?'Partie suivante ▶':'Chanson complète ▶';
+  $('resTitle').textContent='Bravo ! '+(curRange?'Partie '+(curRange.i+1)+' terminée':song.title+' terminé');
   $('resTxt').textContent=stats.ontime+' notes sur '+stats.total+' jouées sans te faire attendre ('+pct+' %)'+(stats.skipped?' · '+stats.skipped+' passée(s)':'')+'.';
   $('result').classList.remove('hidden');
 }
@@ -774,16 +821,48 @@ let last=performance.now();
 function frame(now){ const dt=Math.min(0.1,(now-last)/1000); last=now; lastDt=dt; update(dt,now); draw(now); requestAnimationFrame(frame); }
 
 /* ---------- Interface ---------- */
+/* ---- progression + icônes ---- */
+const ICONS=[['Gamme','🎹','#4f8cff,#6c5ce7'],['Frère Jacques','🔔','#f6a623,#e17055'],['Ah !','🌟','#fdcb6e,#e84393'],['Au clair','🌙','#74b9ff,#0984e3'],
+ ['Hymne','🕊️','#55efc4,#00b894'],['Joyeux','🎂','#ff7675,#fd79a8'],['Jingle','🎅','#ff5d73,#c0392b'],['Douce nuit','⭐','#a29bfe,#6c5ce7'],
+ ['Greensleeves','🌿','#7bed9f,#2ed573'],['Menuet','💃','#ffa502,#ff6348'],['Marche turque','🥁','#e17055,#d63031'],['Maritza','🌹','#fd79a8,#e84393'],
+ ['Tourner','🌀','#81ecec,#6c5ce7'],['Experience','🌊','#74b9ff,#a29bfe'],['Élise','💌','#fab1a0,#e17055']];
+const iconOf=t=>{ for(const [k,e,c] of ICONS) if(t.includes(k)) return {e,c}; return {e:'🎵',c:'#6c8cff,#a29bfe'}; };
+const sicon=(t,sm)=>{ const o=iconOf(t); return `<div class="sicon${sm?' sm':''}" style="background:linear-gradient(135deg,${o.c})">${o.e}</div>`; };
+function prog(){ try{ return JSON.parse(localStorage.getItem('pc_prog')||'{}'); }catch(e){ return {}; } }
+const pkey=(s,r)=>s.title+'#'+(r?r.i:'full');
+function saveStars(s,r,st){ try{ const p=prog(), k=pkey(s,r); if((p[k]||0)<st) p[k]=st; localStorage.setItem('pc_prog',JSON.stringify(p)); }catch(e){} }
+const starsHtml=n=>`<span class="stars">${'★'.repeat(n)}<i>${'★'.repeat(3-n)}</i></span>`;
 function buildMenu(){
-  const grid=$('songGrid'); grid.innerHTML='';
+  $('intro').style.display=''; const grid=$('songGrid'); grid.innerHTML=''; const p=prog();
   SONGS.forEach(s=>{
-    const b=document.createElement('button'); b.className='card';
-    b.innerHTML=`<h3>${s.title}</h3><div class="by">${s.by}</div><span class="tag ${s.level}">${s.level}</span>`;
-    b.onclick=()=>{ loadSong(s); $('menu').classList.add('hidden'); };
+    const ps=partsOf(s), got=ps.reduce((a,q)=>a+(p[pkey(s,q)]||0),0)+(p[pkey(s,null)]||0), tot=(ps.length+1)*3;
+    const b=document.createElement('button'); b.className='srow';
+    b.innerHTML=`<div class="stxt"><h3>${s.title}</h3><div class="by">${s.by}</div><span class="tag ${s.level}">${s.level}</span> <span class="by">· ${ps.length?ps.length+' parties + chanson complète':'chanson complète'}</span>${got?`<div class="by" style="margin-top:4px">★ ${got}/${tot}</div>`:''}</div>${sicon(s.title)}`;
+    b.onclick=()=>buildDetail(s);
     grid.appendChild(b);
   });
 }
-$('btnSongs').onclick=()=>{ playing=false; $('btnPlay').textContent='▶ Jouer'; $('menu').classList.remove('hidden'); };
+function startRange(s,r){ loadSong(s,r); $('menu').classList.add('hidden'); togglePlay(); }
+function buildDetail(s){
+  $('intro').style.display='none'; const grid=$('songGrid'); grid.innerHTML=''; const ps=partsOf(s), p=prog();
+  const back=document.createElement('button'); back.className='back'; back.textContent='← Toutes les chansons'; back.onclick=buildMenu; grid.appendChild(back);
+  const head=document.createElement('div'); head.className='srow'; head.style.cursor='default';
+  head.innerHTML=`<div class="stxt"><h3 style="font-size:22px">${s.title}</h3><div class="by">${s.by}</div><span class="tag ${s.level}">${s.level}</span></div>${sicon(s.title)}`; grid.appendChild(head);
+  if(ps.length){
+    const h=document.createElement('div'); h.className='sec'; h.textContent='Entraînement par parties'; grid.appendChild(h);
+    ps.forEach(q=>{
+      const b=document.createElement('button'); b.className='srow';
+      b.innerHTML=`<div class="pnum">${q.i+1}</div><div class="stxt"><h3>Partie ${q.i+1}</h3><div class="by">mesures ${q.bar0} à ${q.bar1}</div></div>${starsHtml(p[pkey(s,q)]||0)}`;
+      b.onclick=()=>startRange(s,q); grid.appendChild(b);
+    });
+  }
+  const h2=document.createElement('div'); h2.className='sec'; h2.textContent='Pour finir'; grid.appendChild(h2);
+  const f=document.createElement('button'); f.className='srow full';
+  f.innerHTML=`<div class="pnum">🏆</div><div class="stxt"><h3>Chanson complète</h3><div class="by">tout le morceau d'un coup</div></div>${starsHtml(p[pkey(s,null)]||0)}`;
+  f.onclick=()=>startRange(s,null); grid.appendChild(f);
+  document.getElementById('menu').scrollTop=0;
+}
+$('btnSongs').onclick=()=>{ playing=false; $('btnPlay').textContent='▶ Jouer'; buildMenu(); $('menu').classList.remove('hidden'); };
 $('btnPlay').onclick=e=>{ togglePlay(); e.target.blur(); };
 $('btnRestart').onclick=e=>{ restart(); e.target.blur(); };
 $('btnSkip').onclick=e=>{ skipNote(); e.target.blur(); };
@@ -791,7 +870,8 @@ for(const [id,h] of [['hR','R'],['hL','L'],['hB','B']]) $(id).onclick=e=>{ hands
 $('mLearn').onclick=e=>{ setMode('learn'); e.target.blur(); };
 $('mListen').onclick=e=>{ setMode('listen'); e.target.blur(); };
 $('btnAgain').onclick=()=>{ restart(); togglePlay(); };
-$('btnOther').onclick=()=>{ $('result').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+$('btnOther').onclick=()=>{ $('result').classList.add('hidden'); buildDetail(baseSong); $('menu').classList.remove('hidden'); };
+$('btnNext').onclick=()=>{ const ps=partsOf(baseSong); $('result').classList.add('hidden'); const nx=curRange&&curRange.i<ps.length-1?ps[curRange.i+1]:null; loadSong(baseSong,nx); togglePlay(); };
 $('spd').oninput=()=>{ speed=parseFloat($('spd').value); $('spdV').textContent=Math.round(speed*100)+'%'; saveSettings(); };
 $('sens').oninput=saveSettings;
 $('handSel').onchange=e=>{ const v=e.target.value; showHands=v!=='off'; if(showHands) handStyle=v; e.target.blur(); try{ localStorage.setItem('pc_hand',v); }catch(x){} };
@@ -809,6 +889,12 @@ cv.addEventListener('pointerdown',e=>{
   if(hit==null){ const idx=Math.floor(x/ww); let c=0; for(let m=LOW;m<=HIGH;m++){ if(isBlack(m)) continue; if(c===idx){hit=m;break;} c++; } }
   if(hit!=null) screenInput(hit);
 });
+function unlockAudio(){
+  try{ ensureCtx(); if(ctx&&ctx.state!=='running') ctx.resume().catch(()=>{});
+    const b=ctx.createBuffer(1,1,22050), src=ctx.createBufferSource(); src.buffer=b; src.connect(ctx.destination); src.start(0); }catch(e){}
+}
+for(const ev of ['pointerdown','touchend','click','keydown']) addEventListener(ev,unlockAudio,{passive:true});
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) unlockAudio(); });
 addEventListener('resize',()=>{ layout(); setBarH(); });
 /* barre du haut : disparaît après 5 s, revient au toucher */
 let barTimer=null;
@@ -822,7 +908,7 @@ for(const ev of ['pointerdown','touchstart','mousemove','keydown']) addEventList
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&playing) togglePlay(); });
 
 speed=parseFloat($('spd').value); $('spdV').textContent=Math.round(speed*100)+'%';
-layout(); setBarH(); showBar(); buildMenu(); loadSong(SONGS[SONGS.length-1]); $('menu').classList.remove('hidden');
+layout(); setBarH(); showBar(); buildMenu(); loadSong(SONGS[SONGS.length-1]); buildMenu(); $('menu').classList.remove('hidden');
 try{ ensureCtx(); }catch(e){}
 requestAnimationFrame(frame);
 
@@ -833,6 +919,7 @@ window.__piano={
   noteHeard:m=>{ procStamp++; analyser.getFloatTimeDomainData(tmp); return noteHeard(m).ok; },
   tick(dt){ update(dt,performance.now()); },
   get pianoReady(){ return !!pianoSamples; },
+  get audioState(){ return ctx?ctx.state:'none'; },
   songs:SONGS, loadSong, togglePlay
 };
 </script>
