@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PianoChute – apprends le piano gratuitement</title>
+<style>
+:root{--bg:#0d0f1e;--panel:#161932;--panel2:#20244a;--line:#2d3263;--text:#eef0ff;--muted:#9aa1d0;--accent:#6c8cff;--ok:#38e08c;--bad:#ff5d73}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100%}
+#bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#bar label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+#bar input[type=range]{width:90px;accent-color:var(--accent)}
+button{font:inherit;font-size:14px;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.seg{display:flex}
+.seg button{border-radius:0}
+.seg button:first-child{border-radius:8px 0 0 8px}
+.seg button:last-child{border-radius:0 8px 8px 0;border-left:0}
+.seg button.on{background:var(--accent);border-color:var(--accent);font-weight:600}
+#songTitle{font-size:15px}
+#songTitle small{color:var(--muted);font-weight:400}
+#mic{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+#dot{width:10px;height:10px;border-radius:50%;background:#555}
+#dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+#meter{width:60px;height:8px;background:#0a0b17;border-radius:4px;overflow:hidden}
+#meter i{display:block;height:100%;width:0;background:var(--ok)}
+#heard{font-size:14px;min-width:150px}
+#heard b{color:var(--text)}
+#msg{font-size:13px;color:#ffd166}
+#stageWrap{flex:1;position:relative;min-height:0}
+#stage{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
+.overlay{position:absolute;inset:0;background:rgba(8,9,20,.88);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px;z-index:5}
+.overlay.hidden{display:none}
+.box{max-width:980px;width:100%}
+.box h1{margin:0 0 6px;font-size:28px}
+.box p{color:var(--muted);line-height:1.5;margin:6px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-top:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;text-align:left}
+.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.card h3{margin:0 0 4px;font-size:16px}
+.card .by{color:var(--muted);font-size:13px}
+.tag{display:inline-block;margin-top:8px;font-size:11px;padding:2px 8px;border-radius:99px;background:#0d0f1e;border:1px solid var(--line)}
+.tag.Facile{color:var(--ok)}.tag.Moyen{color:#ffd166}.tag.Difficile{color:var(--bad)}
+#result .box{text-align:center;margin-top:8vh}
+#stars{font-size:48px;letter-spacing:6px}
+#result .row{display:flex;gap:10px;justify-content:center;margin-top:18px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <button id="btnSongs">🎼 Chansons</button>
+    <strong id="songTitle"></strong>
+    <button id="btnPlay" class="primary">▶ Jouer</button>
+    <button id="btnRestart" title="Recommencer (R)">↺</button>
+    <button id="btnSkip" title="Passer la note (→)">⏭ Passer la note</button>
+    <div class="seg">
+      <button id="mLearn" class="on" title="L'appli écoute ton piano et attend la bonne note">🎤 Apprendre</button>
+      <button id="mListen" title="L'appli joue la chanson pour que tu l'écoutes">🔊 Écouter</button>
+    </div>
+    <div class="seg" id="handsSeg" style="display:none">
+      <button id="hR" class="on">Main droite</button><button id="hL">Main gauche</button><button id="hB">Deux mains</button>
+    </div>
+    <label>Vitesse <input type="range" id="spd" min="0.4" max="1.5" step="0.05" value="1"><span id="spdV">100%</span></label>
+    <label title="Augmente si l'appli n'entend pas ton piano, baisse si elle valide toute seule">Sensibilité micro <input type="range" id="sens" min="0" max="1" step="0.05" value="0.5"></label>
+    <span id="pstat" style="font-size:13px;color:var(--muted)">🎹 Chargement du piano…</span>
+    <label title="Style des mains">🖐 <select id="handSel"><option value="real">Réalistes</option><option value="color">Colorées</option><option value="off">Sans mains</option></select></label>
+    <div id="mic"><span id="dot"></span><span id="micTxt">Micro éteint</span><div id="meter"><i></i></div></div>
+    <span id="heard">J'entends : <b>—</b></span>
+    <span id="msg"></span>
+  </div>
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="menu" class="overlay">
+      <div class="box">
+        <h1>🎹 PianoChute</h1>
+        <p>Apprends le piano gratuitement : les notes tombent sur un clavier de 61 touches avec leur nom (Do, Ré, Mi…).
+        Place ton vrai piano devant l'ordinateur ou le téléphone, autorise le micro, et joue : l'appli <b>écoute</b>. Si tu joues la bonne touche, ça continue ; sinon, les notes <b>s'arrêtent</b> et attendent.</p>
+        <p>Astuce : tu peux aussi cliquer sur les touches à l'écran. Raccourcis : <b>Espace</b> pause, <b>→</b> passer la note, <b>R</b> recommencer.</p>
+        <div class="grid" id="songGrid"></div>
+      </div>
+    </div>
+    <div id="result" class="overlay hidden">
+      <div class="box">
+        <div id="stars"></div>
+        <h1 id="resTitle">Bravo !</h1>
+        <p id="resTxt"></p>
+        <div class="row"><button id="btnAgain" class="primary">Rejouer</button><button id="btnOther">Autres chansons</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ---------- Notes & chansons ---------- */
+const NAMES=['Do','Do#','Ré','Ré#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'];
+const LETTER={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+const LOW=36, HIGH=96;               // Do2 .. Do7 = 61 touches
+const isBlack=m=>[1,3,6,8,10].includes(m%12);
+const midiFreq=m=>440*Math.pow(2,(m-69)/12);
+const noteLabel=m=>NAMES[m%12]+(Math.floor(m/12)-1);
+
+function parseDur(d){ if(d.includes('/')){ const [a,b]=d.split('/'); return parseFloat(a)/parseFloat(b); } return parseFloat(d); }
+function parseNoteName(nm){
+  const mm=/^([A-G])([#b]?)(-?\d)$/.exec(nm); if(!mm) throw new Error('Note inconnue: '+nm);
+  let m=12*(parseInt(mm[3])+1)+LETTER[mm[1]]+(mm[2]==='#'?1:mm[2]==='b'?-1:0);
+  while(m>HIGH) m-=12; while(m<LOW) m+=12;       // ramène dans les 61 touches
+  return m;
+}
+/* "E4+C5:2" = accord de 2 notes ; R = silence ; unit = durée d'une unité en temps */
+function parseSong(str,unit=1){
+  const notes=[]; let t=0;
+  for(const tok of str.trim().split(/\s+/)){
+    if(!tok||tok==='|') continue;
+    const [nm,d]=tok.split(':'); const dur=parseDur(d)*unit;
+    if(nm!=='R') for(const x of nm.split('+')){ const midi=parseNoteName(x), st=Math.round(t*1e6)/1e6; if(!notes.some(n=>n.start===st&&n.midi===midi)) notes.push({midi,start:st,dur,done:false}); }
+    t+=dur;
+  }
+  return notes;
+}
+function makeEvents(notes){
+  const ev=[]; 
+  for(const n of notes){ const l=ev[ev.length-1]; if(l&&Math.abs(l.start-n.start)<1e-6) l.notes.push(n); else ev.push({start:n.start,notes:[n],done:false,clicked:{}}); }
+  return ev;
+}
+
+/* Format : NOTE:durée (en temps = noires) ; R = silence. Do4 = Do du milieu. */
+const SONGS=[
+ {title:'Gamme de Do majeur',by:'Exercice',level:'Facile',bpm:90,bar:4,
+  data:"C4:1 D4:1 E4:1 F4:1 G4:1 A4:1 B4:1 C5:2 B4:1 A4:1 G4:1 F4:1 E4:1 D4:1 C4:2"},
+ {title:'Frère Jacques',by:'Chanson traditionnelle',level:'Facile',bpm:100,bar:4,
+  data:"C4:1 D4:1 E4:1 C4:1 C4:1 D4:1 E4:1 C4:1 E4:1 F4:1 G4:2 E4:1 F4:1 G4:2 G4:.5 A4:.5 G4:.5 F4:.5 E4:1 C4:1 G4:.5 A4:.5 G4:.5 F4:.5 E4:1 C4:1 C4:1 G3:1 C4:2 C4:1 G3:1 C4:2"},
+ {title:'Ah ! vous dirai-je, maman',by:'Mozart (Twinkle Twinkle)',level:'Facile',bpm:100,bar:4,
+  data:"C4:1 C4:1 G4:1 G4:1 A4:1 A4:1 G4:2 F4:1 F4:1 E4:1 E4:1 D4:1 D4:1 C4:2 G4:1 G4:1 F4:1 F4:1 E4:1 E4:1 D4:2 G4:1 G4:1 F4:1 F4:1 E4:1 E4:1 D4:2 C4:1 C4:1 G4:1 G4:1 A4:1 A4:1 G4:2 F4:1 F4:1 E4:1 E4:1 D4:1 D4:1 C4:2"},
+ {title:'Au clair de la lune',by:'Chanson traditionnelle',level:'Facile',bpm:84,bar:4,
+  data:"C4:1 C4:1 C4:1 D4:1 E4:2 D4:2 C4:1 E4:1 D4:1 D4:1 C4:4 C4:1 C4:1 C4:1 D4:1 E4:2 D4:2 C4:1 E4:1 D4:1 D4:1 C4:4 D4:1 D4:1 D4:1 D4:1 A4:2 A4:2 D4:1 C4:1 B3:1 A3:1 G3:4 C4:1 C4:1 C4:1 D4:1 E4:2 D4:2 C4:1 E4:1 D4:1 D4:1 C4:4"},
+ {title:'Hymne à la joie — version 1',by:'Beethoven, arr. Bruno-Pierre Gagnon (OSQ)',level:'Facile',bpm:100,bar:4,
+  lh:"G3:4 D3:4 G3:4 D3:4 G3:4 D3:4 G3:4 D3:2 G3:2 D3:4 D3:4 D3:2 D#3:2 E3:2 F#3:2 G3:4 D3:4 G3:4 D3:2 G3:2",data:"B4:1 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 B4:1.5 A4:.5 A4:2 B4:1 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 A4:1.5 G4:.5 G4:2 A4:2 B4:1 G4:1 A4:1 B4:.5 C5:.5 B4:1 G4:1 A4:1 B4:.5 C5:.5 B4:1 A4:1 G4:1 A4:1 D4:1 B4:2 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 A4:1.5 G4:.5 G4:2"},
+ {title:'Hymne à la joie — version 2',by:'Beethoven, arr. Bruno-Pierre Gagnon (OSQ)',level:'Facile',bpm:100,bar:4,
+  lh:"G3:2 G3:2 D3:2 D3:2 G3:2 G3:2 D3:2 D3:2 G3:2 G3:2 D3:2 D3:2 G3:2 G3:2 D3:2 G3:2 D3:2 D3:1 G3:1 D3:2 D3:1 G3:1 D3:1 D3:1 D#3:1 D3:1 E3:1 A3:1 D3:1 D3:1 G3:2 G3:2 D3:2 D3:2 G3:2 G3:2 D3:2 G3:2",data:"B4:1 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 B4:1.5 A4:.5 A4:2 B4:1 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 A4:1.5 G4:.5 G4:2 A4:2 B4:1 G4:1 A4:1 B4:.5 C5:.5 B4:1 G4:1 A4:1 B4:.5 C5:.5 B4:1 A4:1 G4:1 A4:1 D4:1 B4:2 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 A4:1.5 G4:.5 G4:2"},
+ {title:'Hymne à la joie — version 3',by:'Beethoven, arr. Bruno-Pierre Gagnon (OSQ)',level:'Moyen',bpm:100,bar:4,
+  lh:"G3:1.5 G3:.5 G3:1.5 G3:.5 D3:1.5 D3:.5 D3:1.5 D3:.5 G3:1.5 G3:.5 G3:1.5 G3:.5 D3:1.5 D3:.5 D3:2 G3:1.5 G3:.5 G3:1.5 G3:.5 D3:1.5 D3:.5 D3:1.5 D3:.5 G3:1.5 G3:.5 G3:1.5 G3:.5 D3:1.5 D3:.5 G3:2 F#3:1 F#3:1 G3:1 B3:1 F#3:1 G3:.5 A3:.5 G3:1 B3:1 F#3:1 G3:.5 A3:.5 F#3:1 D#3:1 E3:1 A3:1 D3:1 D3:1 G3:1.5 G3:.5 G3:1.5 G3:.5 D3:1.5 D3:.5 D3:1.5 D3:.5 G3:1.5 G3:.5 G3:1.5 G3:.5 D3:1.5 D3:.5 G3:2",data:"B4:1 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 B4:1.5 A4:.5 A4:2 B4:1 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 A4:1.5 G4:.5 G4:2 A4:2 B4:1 G4:1 A4:1 B4:.5 C5:.5 B4:1 G4:1 A4:1 B4:.5 C5:.5 B4:1 A4:1 G4:1 A4:1 D4:1 B4:2 B4:1 C5:1 D5:1 D5:1 C5:1 B4:1 A4:1 G4:1 G4:1 A4:1 B4:1 A4:1.5 G4:.5 G4:2"},
+ {title:'Joyeux anniversaire',by:'Chanson traditionnelle',level:'Facile',bpm:104,bar:3,
+  data:"G4:.75 G4:.25 A4:1 G4:1 C5:1 B4:2 G4:.75 G4:.25 A4:1 G4:1 D5:1 C5:2 G4:.75 G4:.25 G5:1 E5:1 C5:1 B4:1 A4:1 F5:.75 F5:.25 E5:1 C5:1 D5:1 C5:2"},
+ {title:'Jingle Bells',by:'James Lord Pierpont',level:'Facile',bpm:120,bar:4,
+  data:"E4:1 E4:1 E4:2 E4:1 E4:1 E4:2 E4:1 G4:1 C4:1.5 D4:.5 E4:4 F4:1 F4:1 F4:1.5 F4:.5 F4:1 E4:1 E4:1 E4:.5 E4:.5 E4:1 D4:1 D4:1 E4:1 D4:2 G4:2 E4:1 E4:1 E4:2 E4:1 E4:1 E4:2 E4:1 G4:1 C4:1.5 D4:.5 E4:4 F4:1 F4:1 F4:1.5 F4:.5 F4:1 E4:1 E4:1 E4:.5 E4:.5 G4:1 G4:1 F4:1 D4:1 C4:4"},
+ {title:'Douce nuit',by:'Franz Gruber',level:'Moyen',bpm:62,bar:3,
+  data:"G4:.75 A4:.25 G4:.5 E4:1.5 G4:.75 A4:.25 G4:.5 E4:1.5 D5:1 D5:.5 B4:1.5 C5:1 C5:.5 G4:1.5 A4:1 A4:.5 C5:.75 B4:.25 A4:.5 G4:.75 A4:.25 G4:.5 E4:1.5 A4:1 A4:.5 C5:.75 B4:.25 A4:.5 G4:.75 A4:.25 G4:.5 E4:1.5 D5:1 D5:.5 F5:.75 D5:.25 B4:.5 C5:1.5 E5:1.5 C5:.5 G4:.5 E4:.5 G4:.75 F4:.25 D4:.5 C4:3"},
+ {title:'Greensleeves',by:'Traditionnel anglais',level:'Moyen',bpm:92,bar:3,
+  data:"A4:.5 C5:1 D5:.5 E5:.75 F5:.25 E5:.5 D5:1 B4:.5 G4:.75 A4:.25 B4:.5 C5:1 A4:.5 A4:.75 G#4:.25 A4:.5 B4:1 G#4:.5 E4:1 A4:.5 C5:1 D5:.5 E5:.75 F5:.25 E5:.5 D5:1 B4:.5 G4:.75 A4:.25 B4:.5 C5:.75 B4:.25 A4:.5 G#4:.75 F#4:.25 G#4:.5 A4:1.5"},
+ {title:'Menuet en Sol',by:'Christian Petzold (attribué à Bach)',level:'Moyen',bpm:112,bar:3,
+  data:"D5:1 G4:.5 A4:.5 B4:.5 C5:.5 D5:1 G4:1 G4:1 E5:1 C5:.5 D5:.5 E5:.5 F#5:.5 G5:1 G4:1 G4:1 C5:1 D5:.5 C5:.5 B4:.5 A4:.5 B4:1 C5:.5 B4:.5 A4:.5 G4:.5 F#4:1 G4:.5 A4:.5 B4:.5 G4:.5 B4:2 A4:1 D5:1 G4:.5 A4:.5 B4:.5 C5:.5 D5:1 G4:1 G4:1 E5:1 C5:.5 D5:.5 E5:.5 F#5:.5 G5:1 G4:1 G4:3"},
+ {title:'Marche turque',by:'Mozart — partition complète, sans reprises',level:'Difficile',bpm:84,bar:2,
+  unit:.25,lh:"R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B2:2 B3:2 E3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 F3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E3:2 A3+E4:2 D3:2 F3+B3:2 C3:2 E3+A3:2 D3:2 F3+B3:2 E3+A3:2 E3+A3:2 E3+G#3:2 E3+G#3:2 A2+A3:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A2:4 R:4 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+C#4:2 B3+C#4:2 B3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E#3:2 G#3+C#4:2 G#3+C#4:2 G#3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+E4:2 B3+E4:2 B3+E4:2 G#3:2 B#3+D#4:2 B#3+D#4:2 B#3+D#4:2 C#4+E4:4 R:4 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 B3:2 D4+E4:2 G#3:2 D4+E4:2 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 E3:2 G#3+D4:2 G#3+D4:2 G#3+D4:2 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 B3:2 D4+E4:2 G#3:2 D4+E4:2 A3:2 F#3:2 D3:2 E3:2 A2:2 A3:2 R:4 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+C#4:2 B3+C#4:2 B3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 C#3:2 G#3+C#4:2 G#3+C#4:2 F#3+C#4:2 B2:2 F#3+B3:2 F#3+B3:2 F#3+B3:2 B2:2 G#3+B3:2 G#3+B3:2 G#3+B3:2 C#3:2 F#3+A3:2 C#3:2 G#3+B3:2 F#3+A3:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A2:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B2:2 B3:2 E3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 F3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E3:2 A3+E4:2 D3:2 F3+B3:2 C3:2 E3+A3:2 D3:2 F3+B3:2 E3+A3:2 E3+A3:2 E3+G#3:2 E3+G#3:2 A2+A3:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 A3:2 A3:2 A3:2 A3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 A3:2 A3:2 A3:2 A3:2 E3:2 E3:2 E3:2 E3:2 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 F#3:1 C#4:1 A3:1 C#4:1 F#3:1 C#4:1 A3:1 C#4:1 F#3:1 D4:1 B3:1 D4:1 F#3:1 D4:1 B3:1 D4:1 F#3:1 C#4:1 A3:1 C#4:1 F#3:1 C#4:1 A3:1 C#4:1 C#3:1 C#4:1 G#3:1 C#4:1 C#3:1 C#4:1 G#3:1 C#4:1 F#3:2 F#3:2 F#3:2 F#3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 A3:2 A3:2 A3:2 A3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A2:4 A2+E3+A3+C#4:4 A2+E3+A3+C#4:4 R:4",data:"B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 C6:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 D#5+F#5:2 E5:4 C#5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:2 G4:2 C5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:4 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:2 E4:2 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 B5:2 C6:2 B5:2 A5:2 G#5:2 A5:2 E5:2 F5:2 D5:2 C5:4 B4:3 A4:.5 B4:.5 A4:4 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 G#4+G#5:2 A4+A5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:4 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 E#5:1 F#5:1 G#5:1 E#5:1 C#5:1 D#5:1 E#5:1 C#5:1 F#5:1 E#5:1 F#5:1 G#5:1 A5:1 G#5:1 A5:1 B5:1 C#6:1 B#5:1 C#6:1 B#5:1 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 E5:1 F#5:1 G#5:1 E5:1 C#5:1 D#5:1 E5:1 C#5:1 D5:1 E5:1 F#5:1 D#5:1 B#4:1 C#5:1 D#5:1 B#4:1 C#5:4 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:1 G#5:1 F#5:1 E5:1 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:2 B5:2 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:1 G#5:1 F#5:1 E5:1 E5:1 D5:1 C#5:1 B4:1 C#5:1 E5:1 A4:1 C#5:1 B4:1 D5:1 G#4:1 B4:1 A4:4 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 C#5:1 D5:1 E5:1 C#5:1 A4:1 B4:1 C#5:1 A4:1 D5:1 C#5:1 D5:1 E5:1 F#5:1 E5:1 F#5:1 G#5:1 A5:1 G#5:1 A5:1 G#5:1 A5:1 G#5:1 A5:1 F#5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 E5:1 F#5:1 G#5:1 E5:1 A5:1 B5:1 C#6:1 F#5:1 E#5:1 F#5:1 G#5:1 E#5:1 F#5:4 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 G#4+G#5:2 A4+A5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 C6:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 D#5+F#5:2 E5:4 C#5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:2 G4:2 C5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:4 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:2 E4:2 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 B5:2 C6:2 B5:2 A5:2 G#5:2 A5:2 E5:2 F5:2 D5:2 C5:4 B4:3 A4:.5 B4:.5 A4:4 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 R:2 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 B4:1 B5:1 A4:1 A5:1 G#4:1 G#5:1 F#4:1 F#5:1 G#4:1 G#5:1 A4:1 A5:1 B4:1 B5:1 G#4:1 G#5:1 E4:1 E5:1 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 R:2 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 B4:1 B5:1 A4:1 A5:1 G#4:1 G#5:1 F#4:1 F#5:1 B4:1 B5:1 G#4:1 G#5:1 E4:1 E5:1 A4+A5:4 C#5+C#6:3 C#6:1 C#5+E5+A5:4 R:4 C#5+E5+A5:4 R:4 D6:1 C#6:1 B5:1 C#6:1 D6:1 C#6:1 B5:1 C#6:1 F#5+A5+D6:8 E5+A5+C#6:2 E5+A5+C#6:2 E5+A5+C#6:2 E5+A5+C#6:2 E5+G#5+B5:6 E6:2 C#5+E5+A5:4 R:4 C#5+E5+A5:4 R:4 D6:1 C#6:1 B5:1 C#6:1 D6:1 C#6:1 B5:1 C#6:1 F#5+A5+D6:8 E5+A5+C#6:8 E5+G#5+B5:2 E5+G#5+B5:2 E5+G#5+B5:2 E5+G#5+B5:2 A5:4 C#6:3 C#6:1 C#6:8 C#6:8 D6:1 C#6:1 B5:1 C#6:1 D6:1 C#6:1 B5:1 C#6:1 D6:8 C#6:2 C#6:2 C#6:2 C#6:2 E5+G#5+B5:6 E6:2 C#5+E5+A5:4 R:4 C#5+E5+A5:4 R:4 D6:1 C#6:1 B5:1 C#6:1 D6:1 C#6:1 B5:1 C#6:1 F#5+A5+D6:8 E5+A5+C#6:8 E5+G#5+B5:2 E5+G#5+B5:2 E5+G#5+B5:2 E5+G#5+B5:2 A4+C#5+E5+A5:6 C#5+C#6:2 A4+A5:6 E5+E6:2 A4+A5:6 C#5+C#6:2 A4+A5:2 C#5+C#6:2 A4+A5:2 E5+E6:2 A4+A5:4 A4+C#5+E5+A5:4 A4+C#5+E5+A5:4 R:4"},
+ {title:'Marche turque (avec reprises)',by:'Mozart — toutes les reprises',level:'Difficile',bpm:84,bar:2,
+  unit:.25,lh:"R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B2:2 B3:2 E3:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B2:2 B3:2 E3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 F3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E3:2 A3+E4:2 D3:2 F3+B3:2 C3:2 E3+A3:2 D3:2 F3+B3:2 E3+A3:2 E3+A3:2 E3+G#3:2 E3+G#3:2 A2+A3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 F3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E3:2 A3+E4:2 D3:2 F3+B3:2 C3:2 E3+A3:2 D3:2 F3+B3:2 E3+A3:2 E3+A3:2 E3+G#3:2 E3+G#3:2 A2+A3:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A2:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A2:4 R:4 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+C#4:2 B3+C#4:2 B3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E#3:2 G#3+C#4:2 G#3+C#4:2 G#3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+E4:2 B3+E4:2 B3+E4:2 G#3:2 B#3+D#4:2 B#3+D#4:2 B#3+D#4:2 C#4+E4:4 R:4 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+C#4:2 B3+C#4:2 B3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E#3:2 G#3+C#4:2 G#3+C#4:2 G#3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+E4:2 B3+E4:2 B3+E4:2 G#3:2 B#3+D#4:2 B#3+D#4:2 B#3+D#4:2 C#4+E4:4 R:4 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 B3:2 D4+E4:2 G#3:2 D4+E4:2 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 E3:2 G#3+D4:2 G#3+D4:2 G#3+D4:2 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 B3:2 D4+E4:2 G#3:2 D4+E4:2 A3:2 F#3:2 D3:2 E3:2 A2:2 A3:2 R:4 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+C#4:2 B3+C#4:2 B3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 C#3:2 G#3+C#4:2 G#3+C#4:2 F#3+C#4:2 B2:2 F#3+B3:2 F#3+B3:2 F#3+B3:2 B2:2 G#3+B3:2 G#3+B3:2 G#3+B3:2 C#3:2 F#3+A3:2 C#3:2 G#3+B3:2 F#3+A3:4 R:4 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 B3:2 D4+E4:2 G#3:2 D4+E4:2 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 E3:2 G#3+D4:2 G#3+D4:2 G#3+D4:2 A3:2 C#4+E4:2 C#4+E4:2 C#4+E4:2 B3:2 D4+E4:2 G#3:2 D4+E4:2 A3:2 F#3:2 D3:2 E3:2 A2:2 A3:2 R:4 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 G#3:2 B3+C#4:2 B3+C#4:2 B3+C#4:2 F#3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 C#3:2 G#3+C#4:2 G#3+C#4:2 F#3+C#4:2 B2:2 F#3+B3:2 F#3+B3:2 F#3+B3:2 B2:2 G#3+B3:2 G#3+B3:2 G#3+B3:2 C#3:2 F#3+A3:2 C#3:2 G#3+B3:2 F#3+A3:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A2:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A2:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B2:2 B3:2 E3:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B3+E4:2 B3+E4:2 E3:2 B3+E4:2 B2:2 B3:2 E3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 F3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E3:2 A3+E4:2 D3:2 F3+B3:2 C3:2 E3+A3:2 D3:2 F3+B3:2 E3+A3:2 E3+A3:2 E3+G#3:2 E3+G#3:2 A2+A3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 C3:2 C4:2 E3:2 E4:2 G3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A2:2 A3:2 C3:2 C4:2 E3:4 R:4 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 C4+E4:2 C4+E4:2 A3:2 C4+E4:2 A3:2 C4+E4:2 F3:2 A3+C#4:2 A3+C#4:2 A3+C#4:2 E3:2 A3+E4:2 D3:2 F3+B3:2 C3:2 E3+A3:2 D3:2 F3+B3:2 E3+A3:2 E3+A3:2 E3+G#3:2 E3+G#3:2 A2+A3:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A2:4 R:4 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 A3:2 A3:2 A3:2 A3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 A3:2 A3:2 A3:2 A3:2 E3:2 E3:2 E3:2 E3:2 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 A3:1 E4:1 C#4:1 E4:1 F#3:1 C#4:1 A3:1 C#4:1 F#3:1 C#4:1 A3:1 C#4:1 F#3:1 D4:1 B3:1 D4:1 F#3:1 D4:1 B3:1 D4:1 F#3:1 C#4:1 A3:1 C#4:1 F#3:1 C#4:1 A3:1 C#4:1 C#3:1 C#4:1 G#3:1 C#4:1 C#3:1 C#4:1 G#3:1 C#4:1 F#3:2 F#3:2 F#3:2 F#3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 D3:2 D3:2 D3:2 D3:2 A3:2 A3:2 A3:2 A3:2 E3:2 E3:2 E3:2 E3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A3:2 A2:4 A2+E3+A3+C#4:4 A2+E3+A3+C#4:4 R:4",data:"B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 C6:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 D#5+F#5:2 E5:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 C6:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 D#5+F#5:2 E5:4 C#5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:2 G4:2 C5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:4 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:2 E4:2 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 B5:2 C6:2 B5:2 A5:2 G#5:2 A5:2 E5:2 F5:2 D5:2 C5:4 B4:3 A4:.5 B4:.5 A4:4 C#5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:2 G4:2 C5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:4 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:2 E4:2 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 B5:2 C6:2 B5:2 A5:2 G#5:2 A5:2 E5:2 F5:2 D5:2 C5:4 B4:3 A4:.5 B4:.5 A4:4 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 G#4+G#5:2 A4+A5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:4 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 G#4+G#5:2 A4+A5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:4 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 E#5:1 F#5:1 G#5:1 E#5:1 C#5:1 D#5:1 E#5:1 C#5:1 F#5:1 E#5:1 F#5:1 G#5:1 A5:1 G#5:1 A5:1 B5:1 C#6:1 B#5:1 C#6:1 B#5:1 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 E5:1 F#5:1 G#5:1 E5:1 C#5:1 D#5:1 E5:1 C#5:1 D5:1 E5:1 F#5:1 D#5:1 B#4:1 C#5:1 D#5:1 B#4:1 C#5:4 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 E#5:1 F#5:1 G#5:1 E#5:1 C#5:1 D#5:1 E#5:1 C#5:1 F#5:1 E#5:1 F#5:1 G#5:1 A5:1 G#5:1 A5:1 B5:1 C#6:1 B#5:1 C#6:1 B#5:1 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 E5:1 F#5:1 G#5:1 E5:1 C#5:1 D#5:1 E5:1 C#5:1 D5:1 E5:1 F#5:1 D#5:1 B#4:1 C#5:1 D#5:1 B#4:1 C#5:4 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:1 G#5:1 F#5:1 E5:1 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:2 B5:2 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:1 G#5:1 F#5:1 E5:1 E5:1 D5:1 C#5:1 B4:1 C#5:1 E5:1 A4:1 C#5:1 B4:1 D5:1 G#4:1 B4:1 A4:4 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 C#5:1 D5:1 E5:1 C#5:1 A4:1 B4:1 C#5:1 A4:1 D5:1 C#5:1 D5:1 E5:1 F#5:1 E5:1 F#5:1 G#5:1 A5:1 G#5:1 A5:1 G#5:1 A5:1 G#5:1 A5:1 F#5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 E5:1 F#5:1 G#5:1 E5:1 A5:1 B5:1 C#6:1 F#5:1 E#5:1 F#5:1 G#5:1 E#5:1 F#5:4 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:1 G#5:1 F#5:1 E5:1 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:2 B5:2 E5:1 D5:1 C#5:1 B4:1 A4:1 B4:1 C#5:1 D5:1 E5:1 F#5:1 G#5:1 A5:1 A5:1 G#5:1 F#5:1 E5:1 E5:1 D5:1 C#5:1 B4:1 C#5:1 E5:1 A4:1 C#5:1 B4:1 D5:1 G#4:1 B4:1 A4:4 C#6:1 D6:1 C#6:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 A5:1 G#5:1 F#5:1 C#5:1 D5:1 E5:1 C#5:1 A4:1 B4:1 C#5:1 A4:1 D5:1 C#5:1 D5:1 E5:1 F#5:1 E5:1 F#5:1 G#5:1 A5:1 G#5:1 A5:1 G#5:1 A5:1 G#5:1 A5:1 F#5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 B5:1 A5:1 G#5:1 F#5:1 E5:1 F#5:1 G#5:1 E5:1 A5:1 B5:1 C#6:1 F#5:1 E#5:1 F#5:1 G#5:1 E#5:1 F#5:4 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 G#4+G#5:2 A4+A5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:4 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 G#4+G#5:2 A4+A5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:2 B4+B5:2 C#5+C#6:4 A4+A5:2 B4+B5:2 C#5+C#6:2 B4+B5:2 A4+A5:2 G#4+G#5:2 F#4+F#5:2 B4+B5:2 G#4+G#5:2 E4+E5:2 A4+A5:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 C6:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 D#5+F#5:2 E5:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 C6:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 F#5+A5:2 B5:2 F#5+A5:2 E5+G5:2 D#5+F#5:2 E5:4 C#5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:2 G4:2 C5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:4 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:2 E4:2 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 B5:2 C6:2 B5:2 A5:2 G#5:2 A5:2 E5:2 F5:2 D5:2 C5:4 B4:3 A4:.5 B4:.5 A4:4 C#5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:2 G4:2 C5+E5:2 D5+F5:2 E5+G5:2 E5+G5:2 A5:1 G5:1 F5:1 E5:1 B4+D5:4 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:2 E4:2 A4+C5:2 B4+D5:2 C5+E5:2 C5+E5:2 F5:1 E5:1 D5:1 C5:1 G#4+B4:4 B4:1 A4:1 G#4:1 A4:1 C5:2 R:2 D5:1 C5:1 B4:1 C5:1 E5:2 R:2 F5:1 E5:1 D#5:1 E5:1 B5:1 A5:1 G#5:1 A5:1 B5:1 A5:1 G#5:1 A5:1 C6:4 A5:2 B5:2 C6:2 B5:2 A5:2 G#5:2 A5:2 E5:2 F5:2 D5:2 C5:4 B4:3 A4:.5 B4:.5 A4:4 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 R:2 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 B4:1 B5:1 A4:1 A5:1 G#4:1 G#5:1 F#4:1 F#5:1 G#4:1 G#5:1 A4:1 A5:1 B4:1 B5:1 G#4:1 G#5:1 E4:1 E5:1 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 R:2 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 B4:1 B5:1 A4:1 A5:1 G#4:1 G#5:1 F#4:1 F#5:1 B4:1 B5:1 G#4:1 G#5:1 E4:1 E5:1 A4+A5:4 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 R:2 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 B4:1 B5:1 A4:1 A5:1 G#4:1 G#5:1 F#4:1 F#5:1 G#4:1 G#5:1 A4:1 A5:1 B4:1 B5:1 G#4:1 G#5:1 E4:1 E5:1 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 R:2 A4:1 A5:1 B4:1 B5:1 C#5:1 C#6:1 B4:1 B5:1 A4:1 A5:1 G#4:1 G#5:1 F#4:1 F#5:1 B4:1 B5:1 G#4:1 G#5:1 E4:1 E5:1 A4+A5:4 C#5+C#6:3 C#6:1 C#5+E5+A5:4 R:4 C#5+E5+A5:4 R:4 D6:1 C#6:1 B5:1 C#6:1 D6:1 C#6:1 B5:1 C#6:1 F#5+A5+D6:8 E5+A5+C#6:2 E5+A5+C#6:2 E5+A5+C#6:2 E5+A5+C#6:2 E5+G#5+B5:6 E6:2 C#5+E5+A5:4 R:4 C#5+E5+A5:4 R:4 D6:1 C#6:1 B5:1 C#6:1 D6:1 C#6:1 B5:1 C#6:1 F#5+A5+D6:8 E5+A5+C#6:8 E5+G#5+B5:2 E5+G#5+B5:2 E5+G#5+B5:2 E5+G#5+B5:2 A5:4 C#6:3 C#6:1 C#6:8 C#6:8 D6:1 C#6:1 B5:1 C#6:1 D6:1 C#6:1 B5:1 C#6:1 D6:8 C#6:2 C#6:2 C#6:2 C#6:2 E5+G#5+B5:6 E6:2 C#5+E5+A5:4 R:4 C#5+E5+A5:4 R:4 D6:1 C#6:1 B5:1 C#6:1 D6:1 C#6:1 B5:1 C#6:1 F#5+A5+D6:8 E5+A5+C#6:8 E5+G#5+B5:2 E5+G#5+B5:2 E5+G#5+B5:2 E5+G#5+B5:2 A4+C#5+E5+A5:6 C#5+C#6:2 A4+A5:6 E5+E6:2 A4+A5:6 C#5+C#6:2 A4+A5:2 C#5+C#6:2 A4+A5:2 E5+E6:2 A4+A5:4 A4+C#5+E5+A5:4 A4+C#5+E5+A5:4 R:4"},
+ {title:'La Maritza',by:'Jean Renard (Sylvie Vartan) — arr. Sezgin Han',level:'Moyen',bpm:66,bar:4,
+  lh:["D3:.5 F3+A3:.5 D3:.5 A3+D4:.5 D3:.5 F3+A3:.5 D3:.5 D2:.5 D3:.5 F3+A3:.5 D3:.5 A3+D4:.5 D3:.5 F3+A3:.5 D3:.5 D2:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 G2:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 C2:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 F2:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 A2:.5 A3:.5 R:3.0 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 G2:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 C2:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 F2:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 A2:.5 A3:.5 R:3.0 D3+F3:1 E3+G3:1 D3+F3:2 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D2:.75 A2+D3:.25 F2:.75 A2+D3:.25 D2:.75 A2+D3:.25 E2+E3:.5 F2+F3:.5 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D3:.5 A3:.5 D4:.5 F4:.5 R:2.0 D3:.5 F3+A3:.5 D3:.5 A3+D4:.5 D3:.5 F3+A3:.5 D3:.5 D2:.5 D3:.5 F3+A3:.5 D3:.5 A3+D4:.5 D3:.5 F3+A3:.5 D3:.5 D2:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 D2:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 F3+A3+D4:.5 D3:.5 G2:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 G#3+A3+D4:.5 D3:.5 C2:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 E3+G3+C4:.5 C3:.5 F2:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 F3+A3+C4:.5 C3:.5 A2:.5 C#3:.5 E3:.5 G3:.5 C#4:2 D3+F3:1 E3+G3:1 D3+F3:2 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D2:.75 A2+D3:.25 F2:.75 A2+D3:.25 D2:.75 A2+D3:.25 E2+E3:.5 F2+F3:.5 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D2:.75 A2+D3:.25 F2:.75 A2+D3:.25 D2:.75 A2+D3:.25 E2+E3:.5 F2+F3:.5 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D2:.75 A2+D3:.25 F2:.75 A2+D3:.25 D2:.75 A2+D3:.25 E2+E3:.5 F2+F3:.5 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 C3:.75 G3+C4:.25 E3:.75 G3+C4:.25 F2:.75 C3+F3:.25 A2:.75 C3+F3:.25 A#2:.75 F#3+A3:.25 D3:.75 F#3+A3:.25 G2:.75 D3+G3:.25 A#2:.75 D3+G3:.25 A2:.75 E3+A3:.25 C#3:.75 E3+A3:.25 D3:.5 D3:.5", "R:110.0 G2:1 R:7.0 F2:1"],data:["E4+G4:.5 R:0.5 F4+A4:.5 R:0.5 E4+G4:.5 R:1.5 E4+G4:.5 R:0.5 F4+A4:.5 R:0.5 E4+G4:.5 R:1.5 A5:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 A4:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 Bb5:1.5 A5:.25 G5:.25 F5:.5 E5:.5 F5:.5 G5:.5 C5:1.5 G5:.25 E5:.25 Bb5:.5 C5:.5 E5:.5 Bb5:.5 A5:3 F4:.5 G4:.5 A4:4 A5:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 A4:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 Bb5:1.5 A5:.25 G5:.25 F5:.5 E5:.5 F5:.5 G5:.5 C5:1.5 G5:.25 E5:.25 Bb5:.5 C5:.5 E5:.5 Bb5:.5 A5:3 F4:.5 G4:.5 A4:4 D5:1 E5:1 F5:2 Bb5:.75 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 E5:.5 D5:.25 C#5:.25 D5:.25 E5:.25 F5:1 D5:.5 E5:.5 F5:.5 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 F4+A4+E5:.5 F4+A4+D5:.5 R:1.0 A4:.5 D5:.5 F5:.5 D6:.5 E4+G4:.5 R:0.5 F4+A4:.5 R:0.5 E4+G4:.5 R:1.5 E4+G4:.5 R:0.5 F4+A4:.5 R:0.5 E4+G4:.5 R:1.5 A5:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 A4:1.5 G5:.25 F5:.25 E5:.5 D5:.5 E5:.5 F5:.5 Bb5:1.5 A5:.25 G5:.25 F5:.5 E5:.5 F5:.5 G5:.5 C5:1.5 G5:.25 E5:.25 Bb5:.5 C5:.5 E5:.5 Bb5:.5 A5:3 F4:.5 G4:.5 A4:4 D5:1 E5:1 F5:2 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 E5:.5 D5:.25 C#5:.25 D5:.25 E5:.25 F5:1 D5:.5 E5:.5 F5:.5 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 E5:.5 D5:.25 C#5:.25 D5:.25 E5:.25 F5:1 D5:.5 E5:.5 F5:.5 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 G5:.25 F5:.25 E5:.5 D5:.5 C#5:.25 B4:.25 C5:.75 A4:.25 B4:.25 C5:.25 E5:.5 D5:.25 C#5:.25 D5:.25 E5:.25 F5:1 D5:.5 E5:.5 F5:.5 Bb5:.5 Bb5:.25 A5:.25 G5:.5 F5:.5 E5:.25 D5:.25 E5:.75 C5:.25 D5:.25 E5:.25 A5:.5 A5:.25 G5:.25 F5:.5 E5:.5 D5:.25 C5:.25 D5:.75 Bb4:.25 C5:.25 D5:.25 G5:.5 F5:.5 E5:.5 D5:.5 C#5:1 D5:1 F4+A4+E5:.5 F4+A4+D5:.5", "R:29.0 E4:.5 A4:.5 C#5:.5 E5:.5 G5:.5 A5:.5 R:21.0 E4:.5 A4:.5 C#5:.5 E5:.5 G5:.5 A5:.5 R:65.0 A4:1 B4:1 C#5:1"]},
+ {title:'Tourner dans le vide',by:'Indila — partition piano (Top G)',level:'Difficile',bpm:120,bar:4,
+  lh:"B3+D4+F#4:2 B3+D4+F#4:2 A3+C#4+E4:2 A3+C#4+E4:2 G#3+B3+D#4:2 G#3+B3+D#4:2 C#4+F4+G#4:2 C#4+F4+G#4:2 B3+D4+F#4:2 B3+D4+F#4:2 A3+C#4+E4:2 A3+C#4+E4:2 G#3+B3+D#4:2 G#3+B3+D#4:2 C#4+F4+G#4:2 C#4+F4+G#4:2 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4 A2+C#3+E3:4 G#2+B2+D#3:4 C#3+F3+G#3:4 B2+D3+F#3:4",data:"G#5:.5 D6:.5 D6:.5 D6:.5 G#5:.5 D6:.5 D6:.5 D6:.5 F#5:.5 D6:.5 D6:.5 D6:.5 F#5:.5 D6:.5 D6:.5 D6:.5 E5:.5 D6:.5 D6:.5 D6:.5 E5:.5 D6:.5 D6:.5 D6:.5 E6:.5 A5:.5 G#5:.5 A5:.5 E6:.5 A5:.5 G#5:.5 A5:.5 G#5:.5 D6:.5 D6:.5 D6:.5 G#5:.5 D6:.5 D6:.5 D6:.5 F#5:.5 D6:.5 D6:.5 D6:.5 F#5:.5 D6:.5 D6:.5 D6:.5 E5:.5 D6:.5 D6:.5 D6:.5 E5:.5 D6:.5 D6:.5 D6:.5 E6:.5 A5:.5 G#5:.5 A5:.5 E6:.5 A5:.5 G#5:.5 A5:.5 C#5:1 B4:.5 C#5:.5 B4:1.5 R:.5 B4:.5 B4:1 A4:.25 B4:.25 A4:1.5 R:.5 G#4:.5 A4:.5 G#4:.5 A4:.5 B4:1.5 R:.5 A4:.5 G#4:.5 F#4:.5 A4:.25 A4:.25 G#4:1.5 R:.5 C#5:.5 B4:.5 C#5:.5 D5:.5 D5:1.5 D5:.5 G#5:.5 A5:.5 G#5:.5 F#5:.5 C#5:1.5 R:.5 C#5:.25 C#5:.25 B4:.5 C#5:.5 B4:2 A4:.5 C#5:.5 D5:.5 C#5:.5 D5:.5 C#5:1.5 R:.5 R:1 C#5:.5 B4:.5 C#5:.5 B4:1 A4:.5 A4:4 R:.5 B4:.5 A4:.5 B4:.5 A4:1.5 G#4:2 C#5:1.5 E5:.5 C#5:.5 D5:2 R:.5 A5:.5 G#5:.5 F#5:.5 C#5:3 R:.5 B4:.5 C#5:.75 D5:.75 C#5:.25 D5:.25 C#5:1 C#5:1 C#5:.5 D5:.5 C#5:1.5 B4:.5 D5:.5 C#5:1 D5:.5 D5:.5 D5:.5 F#5:2 C#5:.5 C#5:.25 C#5:.25 C#5:.5 C#5:.5 F#5:2 D5:.5 C#5:.5 B4:.5 C#5:.5 D5:.5 D5:.75 D5:.25 G#5:.25 F#5:.25 A5:1.5 G#5:.5 G#5:1 F#5:1 R:.5 D5:.5 D5:.5 D5:.5 F#5:2 C#5:.5 C#5:.25 C#5:.25 C#5:.5 C#5:.5 F#5:1.5 D5:.5 C#5:.5 D5:.5 C#5:.5 D5:.5 C#5:1 D5:1/3 C#5:1/3 D5:1/3 C#5:1.5 C#5:.5 D5:1 D5:1 D5:.5 D5:.5 D5:.5 F#5:.5 F#5:.5 F#5:.5 G#5:.5 F#5:.5 C#5:.5 C#5:.5 C#5:.5 F#5:.5 F#5:.5 F#5:.5 G#5:.5 F#5:.5 D5:.5 D5:.5 D5:.5 F#5:.5 F#5:.5 F#5:1 G#5:.25 F#5:.25 G#5:2 G#5:1 F#5:.5 G#5:.5 D5:.5 D5:.5 D5:.5 F#5:.5 F#5:.5 F#5:.5 G#5:.5 F#5:.5 C#5:.5 C#5:.5 C#5:.5 F#5:.5 F#5:.5 F#5:.5 G#5:.5 F#5:.5 D5:.5 D5:.5 D5:.5 F#5:.5 F#5:.5 F#5:1 G#5:.25 F#5:.25 A5:2 G#5:2 C#5:.5 B4:.5 C#5:.5 B4:2.5 B4:.5 A4:.5 B4:.5 A4:2.5 C#5:.5 B4:.5 C#5:.5 B4:2.5 G#4:.5 A4:.5 G#4:.5 A4:.5 B4:2 C#5:.5 B4:.5 C#5:.5 B4:2.5 B4:.5 A4:.5 B4:.5 A4:2.5 G#4:.5 A4:.5 G#4:.5 A4:.5 G#4:2 C#5:4 C#5:1 C#5:.25 B4:.25 B4:.25 C#5:.25 B4:1.5 A4:.5 B4:1.5 A4:.25 B4:.25 A4:1.5 A4:.5 G#4:1 A4:.5 G#4:.5 A4:.5 B4:1 A4:.5 G#4:1 F#4:.25 G#4:.25 A4:.5 G#4:1 F#4:1 R:.5 D5:.25 C#5:.25 B4:.5 C#5:.5 D5:1.5 D5:.25 D5:.25 G#5:.5 A5:.5 G#5:.5 F#5:.5 C#5:2 R:.5 C#5:.25 C#5:.25 C#5:.5 B4:.25 C#5:.25 B4:1.5 A4:.25 A4:.25 C#5:1 D5:.5 C#5:.25 D5:.25 C#5:2 R:1.25 C#5:.25 B4:.25 C#5:.25 B4:1.5 A4:.5 A4:4 R:.5 B4:.5 A4:.5 B4:.5 A4:1.5 G#4:1.5 C#5:2 E5:.5 C#5:.5 D5:2 R:.5 A5:.5 G#5:.5 F#5:.5 C#5:3 R:.5 B4:.5 C#5:.5 D5:.5 C#5:.5 D5:.5 C#5:.75 D5:.75 C#5:.25 D5:.25 C#5:1.5 B4:.5 D5:1 C#5:1 D5:.5 D5:.5 D5:.5 D5:.5 F#5:2"},
+ {title:'Lettre à Élise',by:'Beethoven — partition complète',level:'Difficile',bpm:66,bar:1.5,
+  unit:.25,lh:"R:2 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:1 R:2 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 C3:1 G3:1 C4:1 R:3 G2:1 G3:1 B3:1 R:3 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 E4:1 R:2 E4:1 E5:1 R:2 D#5:1 E5:1 R:1 R:1 D#5:1 E5:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 C3:1 G3:1 C4:1 R:3 G2:1 G3:1 B3:1 R:3 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 E4:1 R:2 E4:1 E5:1 R:2 D#5:1 E5:1 R:1 R:1 D#5:1 E5:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 Bb3+C4:1 A3+C4:1 G3+Bb3+C4:1 F3:1 A3:1 C4:1 A3:1 C4:1 A3:1 F3:1 Bb3:1 D4:1 Bb3:1 D4:1 Bb3:1 F3:1 E4:1 G3+Bb3:1 E4:1 G3+Bb3:1 E4:1 F3:1 A3:1 C4:1 A3:1 C4:1 A3:1 F3:1 A3:1 C4:1 A3:1 C4:1 A3:1 E3:1 A3:1 C4:1 A3:1 D3+D4:1 F3:1 G3:1 E4:1 G3:1 E4:1 G3:1 F4:1 C4+E4+G4:2 R:1 F4+G4:1 E4+G4:1 D4+F4+G4:1 C4+E4+G4:2 F3+A3:2 G3+B3:2 C4:2 R:1 F4+G4:1 E4+G4:1 D4+F4+G4:1 C4+E4+G4:2 F3+A3:2 G3+B3:2 G#3+B3+E4:2 R:4 R:6 R:6 R:6 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 C3:1 G3:1 C4:1 R:3 G2:1 G3:1 B3:1 R:3 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 E4:1 R:2 E4:1 E5:1 R:2 D#5:1 E5:1 R:1 R:1 D#5:1 E5:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 D2+A2:1 D2+A2:1 D2+A2:1 D2+A2:1 D2+A2:1 D2+A2:1 D#2+A2:1 D#2+A2:1 D#2+A2:1 D#2+A2:1 D#2+A2:1 D#2+A2:1 E2+A2:1 E2+A2:1 E2+A2:1 E2+A2:1 E2+G#2:1 E2+G#2:1 A1+A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 A2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 Bb2:1 B2:1 B2:1 B2:1 B2:1 B2:1 B2:1 C3:4 R:2 E3+G#3+B3:2 R:4 A1:2 R:2 A3+C4+E4:2 A3+C4+E4:2 R:2 A3+C4+E4:2 A3+C4+E4:2 R:2 A3+C4+E4:2 A3+C4+E4:2 R:4 R:6 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 C3:1 G3:1 C4:1 R:3 G2:1 G3:1 B3:1 R:3 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 E4:1 R:2 E4:1 E5:1 R:2 D#5:1 E5:1 R:1 R:1 D#5:1 E5:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A2:1 E3:1 A3:1 R:3 R:6 A2:1 E3:1 A3:1 R:3 E2:1 E3:1 G#3:1 R:3 A1:2 R:4",data:"E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:4 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 B4:1 C5:1 D5:1 E5:3 G4:1 F5:1 E5:1 D5:3 F4:1 E5:1 D5:1 C5:3 E4:1 D5:1 C5:1 B4:2 R:1 E4:1 E5:1 R:1 R:1 E5:1 E6:1 R:2 D#5:1 E5:1 R:2 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 B4:1 C5:1 D5:1 E5:3 G4:1 F5:1 E5:1 D5:3 F4:1 E5:1 D5:1 C5:3 E4:1 D5:1 C5:1 B4:2 R:1 E4:1 E5:1 R:1 R:1 E5:1 E6:1 R:2 D#5:1 E5:1 R:2 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 E4+C5:1 F4+C5:1 E4+G4+C5:1 F4:.5 A4:.5 C5:3 F5:1.5 E5:.5 E5:2 D5:2 Bb5:1.5 A5:.5 A5:1 G5:1 F5:1 E5:1 D5:1 C5:1 Bb4:2 A4:1.75 Bb4:.25 A4:.5 G4:.5 A4:.5 Bb4:.5 C5:4 D5:1 D#5:1 E5:3 E5:1 F5:1 A4:1 C5:4 D5:1.5 B4:.5 C5:.5 G5:.5 G4:.5 G5:.5 A4:.5 G5:.5 B4:.5 G5:.5 C5:.5 G5:.5 D5:.5 G5:.5 E5:.5 G5:.5 C6:.5 B5:.5 A5:.5 G5:.5 F5:.5 E5:.5 D5:.5 G5:.5 F5:.5 D5:.5 C5:.5 G5:.5 G4:.5 G5:.5 A4:.5 G5:.5 B4:.5 G5:.5 C5:.5 G5:.5 D5:.5 G5:.5 E5:.5 G5:.5 C6:.5 B5:.5 A5:.5 G5:.5 F5:.5 E5:.5 D5:.5 G5:.5 F5:.5 D5:.5 E5:.5 F5:.5 E5:.5 D#5:.5 E5:.5 B4:.5 E5:.5 D#5:.5 E5:.5 B4:.5 E5:.5 D#5:.5 E5:3 B4:1 E5:1 D#5:1 E5:3 B4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 B4:1 C5:1 D5:1 E5:3 G4:1 F5:1 E5:1 D5:3 F4:1 E5:1 D5:1 C5:3 E4:1 D5:1 C5:1 B4:2 R:1 E4:1 E5:1 R:1 R:1 E5:1 E6:1 R:2 D#5:1 E5:1 R:2 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:4 E4+G4+Bb4+C#5:6 F4+A4+D5:4 C#5+E5:1 D5+F5:1 G#4+D5+F5:4 G4+D5+F5:2 A4+C5+E5:6 F4+D5:4 E4+C5:1 D4+B4:1 C4+F#4+A4:4 C4+A4:2 C4+A4:2 E4+C5:2 D4+B4:2 C4+A4:6 E4+G4+Bb4+C#5:6 F4+A4+D5:4 C#5+E5:1 D5+F5:1 D5+F5:4 D5+F5:2 D5+F5:6 G4+Eb5:4 F4+D5:1 Eb4+C5:1 D4+F4+Bb4:4 D4+F4+A4:2 D4+F4+G#4:4 D4+F4+G#4:2 C4+E4+G4:4 R:2 E4+B4:2 R:4 A3:2/3 C4:2/3 E4:2/3 A4:2/3 C5:2/3 E5:2/3 D5:2/3 C5:2/3 B4:2/3 A4:2/3 C5:2/3 E5:2/3 A5:2/3 C6:2/3 E6:2/3 D6:2/3 C6:2/3 B5:2/3 A5:2/3 C6:2/3 E6:2/3 A6:2/3 C7:2/3 E7:2/3 D7:2/3 C7:2/3 B6:2/3 A#6:2/3 A6:2/3 G#6:2/3 G6:2/3 F#6:2/3 F6:2/3 E6:2/3 D#6:2/3 D6:2/3 C#6:2/3 C6:2/3 B5:2/3 A#5:2/3 A5:2/3 G#5:2/3 G5:2/3 F#5:2/3 F5:2/3 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:1 B4:1 C5:1 D5:1 E5:3 G4:1 F5:1 E5:1 D5:3 F4:1 E5:1 D5:1 C5:3 E4:1 D5:1 C5:1 B4:2 R:1 E4:1 E5:1 R:1 R:1 E5:1 E6:1 R:2 D#5:1 E5:1 R:2 D#5:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 G#4:1 B4:1 C5:2 R:1 E4:1 E5:1 D#5:1 E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 A4:2 R:1 C4:1 E4:1 A4:1 B4:2 R:1 E4:1 C5:1 B4:1 A4:2 R:4"}
+];
+const parseAll=(d,u)=>[].concat(...(Array.isArray(d)?d:[d]).map(x=>parseSong(x,u))).sort((a,b)=>a.start-b.start);
+SONGS.forEach(s=>{ s.notes=parseAll(s.data,s.unit||1); if(s.lh) s.notesL=parseAll(s.lh,s.unit||1).map(n=>({...n,hand:'L'})); s.end=Math.max(...s.notes.concat(s.notesL||[]).map(n=>n.start+n.dur)); });
+let hands='R';
+function songNotes(s){ if(!s.lh||hands==='R') return s.notes; if(hands==='L') return s.notesL; return s.notes.concat(s.notesL).sort((a,b)=>a.start-b.start); }
+
+/* ---------- État ---------- */
+const $=id=>document.getElementById(id);
+let song=SONGS[0], notes=[], events=[], nextIdx=0, demoIdx=0;
+let t=-2, playing=false, waiting=false, waitSince=0, mode='learn', speed=1;
+let stats={total:0,ontime:0,skipped:0};
+let lastAcc={midi:-1,time:-1};
+const pressed={};           // midi -> timestamp (clics écran)
+let heard=null, heardCount=0, heardOK=false;
+const EARLY=0.4;            // on accepte une note jusqu'à 0,4 temps avant la ligne
+
+try{ const s=JSON.parse(localStorage.getItem('pianochute')||'{}'); if(s.spd) $('spd').value=s.spd; if(s.sens!=null) $('sens').value=s.sens; }catch(e){}
+function saveSettings(){ try{ localStorage.setItem('pianochute',JSON.stringify({spd:$('spd').value,sens:$('sens').value})); }catch(e){} }
+
+/* ---------- Audio : synthé + micro ---------- */
+let ctx=null, master=null, analyser=null, micOn=false, micStream=null, loopback=false;
+const BUF=16384, tmp=new Float32Array(BUF);
+
+/* Vrai piano à queue : échantillons Salamander Grand Piano (CC-BY, A. Salamander), dossier piano/ */
+let pianoSamples=null, pianoLoading=false;
+const SAMPLE_NAMES={33:'A1',36:'C2',39:'Ds2',42:'Fs2',45:'A2',48:'C3',51:'Ds3',54:'Fs3',57:'A3',60:'C4',63:'Ds4',66:'Fs4',69:'A4',72:'C5',75:'Ds5',78:'Fs5',81:'A5',84:'C6',87:'Ds6',90:'Fs6',93:'A6',96:'C7'};
+function setPianoSt(ok){ const e=document.getElementById('pstat'); if(e) e.textContent=ok?'🎹 Piano réel prêt':'🎹 Son synthétisé'; }
+async function loadPiano(){
+  if(pianoSamples||pianoLoading) return; pianoLoading=true;
+  try{
+    const out={};
+    await Promise.all(Object.entries(SAMPLE_NAMES).map(async([m,n])=>{
+      const r=await fetch('piano/'+n+'.mp3'); if(!r.ok) throw new Error(n);
+      out[m]=await ctx.decodeAudioData(await r.arrayBuffer());
+    }));
+    pianoSamples=out; setPianoSt(true);
+  }catch(e){ setPianoSt(false); setMsg('Piano réel indisponible : ouvre la page via http://localhost:8765 (serveur local). Son synthétisé en attendant.'); }
+  pianoLoading=false;
+}
+function samplePlay(midi,dur,when){
+  const base=Math.max(33,Math.min(96,Math.round((midi-33)/3)*3+33));
+  const t0=when||ctx.currentTime, hold=Math.max(dur+0.4,1.0), relTc=0.3;
+  const src=ctx.createBufferSource(); src.buffer=pianoSamples[base];
+  src.playbackRate.value=Math.pow(2,(midi-base)/12);
+  const g=ctx.createGain(), vel=0.9;
+  g.gain.setValueAtTime(vel,t0); g.gain.setTargetAtTime(0,t0+hold,relTc);
+  src.connect(g); g.connect(master); g.connect(reverbIn); if(loopback) g.connect(analyser);
+  src.start(t0); src.stop(t0+hold+relTc*6+0.1);
+}
+let reverbIn=null, noiseBuf=null;
+function makeIR(c,sec,decay){
+  const n=Math.floor(c.sampleRate*sec), b=c.createBuffer(2,n,c.sampleRate);
+  for(let ch=0;ch<2;ch++){ const d=b.getChannelData(ch); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,decay); }
+  return b;
+}
+function ensureCtx(){
+  if(ctx){ if(ctx.state==='suspended') ctx.resume(); return; }
+  ctx=new (window.AudioContext||window.webkitAudioContext)();
+  master=ctx.createGain(); master.gain.value=0.7;
+  const comp=ctx.createDynamicsCompressor(); comp.threshold.value=-20; comp.ratio.value=3.5; comp.attack.value=0.005; comp.release.value=0.25;
+  master.connect(comp); comp.connect(ctx.destination);
+  const conv=ctx.createConvolver(); conv.buffer=makeIR(ctx,1.8,3.2);
+  const wet=ctx.createGain(); wet.gain.value=0.12; reverbIn=ctx.createGain(); reverbIn.connect(conv); conv.connect(wet); wet.connect(comp);
+  const nb=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.05),ctx.sampleRate), nd=nb.getChannelData(0);
+  for(let i=0;i<nd.length;i++) nd[i]=(Math.random()*2-1)*Math.pow(1-i/nd.length,2); noiseBuf=nb;
+  analyser=ctx.createAnalyser(); analyser.fftSize=BUF; analyser.smoothingTimeConstant=0;
+  const z=ctx.createGain(); z.gain.value=0; analyser.connect(z); z.connect(ctx.destination);
+  loadPiano();
+}
+/* Piano synthétisé : partiels légèrement inharmoniques, 2 cordes désaccordées, marteau, filtre, réverbération */
+function synth(midi,dur,when){
+  ensureCtx();
+  if(pianoSamples) return samplePlay(midi,dur,when);
+  return synthFallback(midi,dur,when);
+}
+function synthFallback(midi,dur,when){
+  const f=midiFreq(midi), t0=when||ctx.currentTime, vel=0.85;
+  const hold=Math.max(dur,0.15), relTc=0.07+0.12*Math.pow(2,-(midi-36)/18);
+  const T0=Math.max(0.8,5.5*Math.pow(2,-(midi-36)/22));
+  const B=0.00005*Math.pow(1.06,midi-48);
+  const out=ctx.createGain(), lp=ctx.createBiquadFilter();
+  lp.type='lowpass'; lp.frequency.value=Math.min(9000,f*8+1800); lp.Q.value=0.4;
+  out.connect(lp); lp.connect(master); lp.connect(reverbIn); if(loopback) lp.connect(analyser);
+  const nP=Math.max(3,Math.min(12,Math.floor(9000/f))), stop=t0+hold+relTc*8+0.1;
+  for(let n=1;n<=nP;n++){
+    const fn=f*n*Math.sqrt(1+B*n*n);
+    const a=Math.abs(Math.sin(n*Math.PI*0.14))/Math.pow(n,0.85)+0.04;
+    const tau=T0/(1+0.55*(n-1));
+    const cents=n<=3?[-0.45,0.45]:[0];
+    for(const c of cents){ const sw=cents.length===1?1:(c<0?0.6:0.4);
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='sine'; o.frequency.value=fn*Math.pow(2,c/1200);
+      g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(a*vel*0.2*sw,t0+0.004);
+      g.gain.setTargetAtTime(0,t0+0.004,tau);
+      g.gain.setTargetAtTime(0,t0+hold,relTc);
+      o.connect(g); g.connect(out); o.start(t0); o.stop(stop);
+    }
+  }
+  // bruit de marteau
+  const ns=ctx.createBufferSource(), bp=ctx.createBiquadFilter(), ng=ctx.createGain();
+  ns.buffer=noiseBuf; bp.type='bandpass'; bp.frequency.value=Math.min(6000,f*5); bp.Q.value=0.7; ng.gain.value=0.06*vel;
+  ns.connect(bp); bp.connect(ng); ng.connect(out); ns.start(t0);
+}
+async function startMic(){
+  if(micOn) return true;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    setMsg('Micro indisponible : ouvre la page via http://localhost (voir l\'aide) ou utilise Chrome. Tu peux cliquer les touches à l\'écran.'); return false; }
+  try{
+    ensureCtx();
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    ctx.createMediaStreamSource(micStream).connect(analyser);
+    micOn=true; setMicUI(); setMsg(''); return true;
+  }catch(e){
+    setMsg('Micro refusé ou introuvable. Autorise-le dans le navigateur, ou clique les touches à l\'écran.'); return false; }
+}
+function setMicUI(){ $('dot').classList.toggle('on',micOn); $('micTxt').textContent=micOn?'Micro actif':'Micro éteint'; }
+function setMsg(s){ $('msg').textContent=s; }
+
+/* FFT */
+function makeFFT(n){
+  const lv=Math.log2(n), rev=new Uint32Array(n), cs=new Float32Array(n/2), sn=new Float32Array(n/2);
+  for(let i=0;i<n;i++){ let r=0; for(let b=0;b<lv;b++) r|=((i>>b)&1)<<(lv-1-b); rev[i]=r; }
+  for(let i=0;i<n/2;i++){ cs[i]=Math.cos(2*Math.PI*i/n); sn[i]=Math.sin(2*Math.PI*i/n); }
+  return (re,im)=>{
+    for(let i=0;i<n;i++){ const j=rev[i]; if(j>i){ let a=re[i];re[i]=re[j];re[j]=a; a=im[i];im[i]=im[j];im[j]=a; } }
+    for(let size=2;size<=n;size<<=1){
+      const half=size>>1, step=n/size;
+      for(let i=0;i<n;i+=size){
+        for(let j=i,k=0;j<i+half;j++,k+=step){
+          const l=j+half, tr=re[l]*cs[k]+im[l]*sn[k], ti=-re[l]*sn[k]+im[l]*cs[k];
+          re[l]=re[j]-tr; im[l]=im[j]-ti; re[j]+=tr; im[j]+=ti;
+        }
+      }
+    }
+  };
+}
+const ffts={}, wins={}, specCache={};
+let procStamp=0;
+function getSpec(Nw){
+  const c=specCache[Nw]; if(c&&c.stamp===procStamp) return c;
+  const Nf=Nw*2;
+  if(!ffts[Nf]) ffts[Nf]=makeFFT(Nf);
+  if(!wins[Nw]){ const w=new Float32Array(Nw); for(let i=0;i<Nw;i++) w[i]=0.5-0.5*Math.cos(2*Math.PI*i/(Nw-1)); wins[Nw]=w; }
+  const re=new Float32Array(Nf), im=new Float32Array(Nf), w=wins[Nw], off=BUF-Nw;
+  for(let i=0;i<Nw;i++) re[i]=tmp[off+i]*w[i];
+  ffts[Nf](re,im);
+  const mag=new Float32Array(Nf/2);
+  for(let k=0;k<mag.length;k++) mag[k]=4*Math.hypot(re[k],im[k])/Nw;
+  return specCache[Nw]={stamp:procStamp,mag,df:ctx.sampleRate/Nf};
+}
+function peakMag(sp,f){
+  const lo=Math.max(1,Math.floor(f*0.98/sp.df)), hi=Math.min(sp.mag.length-2,Math.ceil(f*1.02/sp.df));
+  let m=0; for(let k=lo;k<=hi;k++) if(sp.mag[k]>m) m=sp.mag[k]; return m;
+}
+function medianBand(sp,f1,f2){
+  const lo=Math.max(1,Math.floor(f1/sp.df)), hi=Math.min(sp.mag.length-1,Math.ceil(f2/sp.df)), a=[];
+  for(let k=lo;k<=hi;k+=2) a.push(sp.mag[k]); a.sort((x,y)=>x-y); return a[a.length>>1]||0;
+}
+const SEMI=Math.pow(2,1/12);
+const absMin=()=>0.003*Math.pow(10,-2*parseFloat($('sens').value));
+const kFactor=()=>12-8*parseFloat($('sens').value);
+
+/* La note cible est-elle présente dans le son ? */
+function noteHeard(midi,others=[]){
+  const f0=midiFreq(midi), sp=getSpec(f0<140?16384:8192), m=f=>peakMag(sp,f);
+  let a=m(f0);
+  if(f0<150) a=Math.max(a,0.7*m(2*f0));           // fondamentale faible dans les graves
+  const r={ok:false,a};
+  if(a<absMin()) return r;
+  if(a<medianBand(sp,f0/2,f0*2.2)*kFactor()) return r;
+  const nb=Math.max(others.includes(midi+1)?0:m(f0*SEMI), others.includes(midi-1)?0:m(f0/SEMI));
+  if(a<0.6*nb) return r;                            // une touche voisine sonne plus fort
+  for(const [k,off] of [[2,12],[3,19]]){ const fs=f0/k; if(fs>=62 && !others.some(o=>o<midi) && m(fs)>1.6*a) return r; } // harmonique d'une note plus grave
+  r.ok=true; return r;
+}
+/* Note dominante (affichage) */
+function dominantNote(){
+  const sp=getSpec(8192), lo=Math.floor(120/sp.df), hi=Math.floor(1700/sp.df);
+  let best=0,bk=0; for(let k=lo;k<hi;k++) if(sp.mag[k]>best){best=sp.mag[k];bk=k;}
+  if(best<absMin()*1.5) return null;
+  if(best<medianBand(sp,150,1700)*kFactor()) return null;
+  const y0=sp.mag[bk-1],y1=sp.mag[bk],y2=sp.mag[bk+1], d=(y0-2*y1+y2)||1e-9;
+  let f=(bk+0.5*(y0-y2)/d)*sp.df;
+  for(const k of [4,3,2]){ if(f/k>=65 && peakMag(sp,f/k)>=0.35*best){ f=f/k; break; } }
+  return Math.round(69+12*Math.log2(f/440));
+}
+
+/* Enveloppe étroite autour de la fréquence f0 (détection d'une nouvelle frappe, même sur une note qui résonne encore) */
+let riseAt=-1;
+function bandRise(f0){
+  const N=1024, K=8, w=2*Math.PI*f0/ctx.sampleRate, cr=Math.cos(w), ci=-Math.sin(w), start=BUF-N*K, env=new Float32Array(K);
+  let re=1, im=0;
+  for(let k=0;k<K;k++){
+    let a=0,b=0;
+    for(let n=0;n<N;n++){ const x=tmp[start+k*N+n]; a+=x*re; b+=x*im; const t=re*cr-im*ci; im=re*ci+im*cr; re=t; }
+    env[k]=Math.hypot(a,b)/N;
+  }
+  for(let k=5;k<K;k++){
+    const base=(env[k-4]+env[k-3]+env[k-2])/3;
+    if(env[k]>absMin()*0.6&&env[k]>1.5*base) return true;
+  }
+  return false;
+}
+/* traitement du micro */
+const hist=[], aHist=[]; let aHistIdx=-1, lastProc=0, lastOnset=0, hold=0, rmsNow=0;
+function processAudio(now){
+  if(!micOn||!analyser) return;
+  if(now-lastProc<28) return; lastProc=now; procStamp++;
+  analyser.getFloatTimeDomainData(tmp);
+  let s=0; for(let i=BUF-1024;i<BUF;i++) s+=tmp[i]*tmp[i];
+  rmsNow=Math.sqrt(s/1024);
+  $('meter').firstElementChild.style.width=Math.min(100,rmsNow*600)+'%';
+  hist.push({t:now,r:rmsNow}); while(hist[0].t<now-700) hist.shift();
+  let sum=0,c=0; for(const h of hist){ const age=now-h.t; if(age>90&&age<320){sum+=h.r;c++;} }
+  let ps=0,pc=0; for(const h of hist){ const age=now-h.t; if(age>15&&age<70){ps+=h.r;pc++;} }
+  const rising=pc?rmsNow>1.25*(ps/pc):true;
+  if(c&&rising&&rmsNow>sum/c*1.7+0.001&&now-lastOnset>100) lastOnset=now;
+
+  // note entendue (affichage + retour visuel)
+  const dn=dominantNote();
+  if(dn===heard&&dn!=null) heardCount++; else { heard=dn; heardCount=dn!=null?1:0; }
+  $('heard').innerHTML="J'entends : <b>"+(heard!=null&&heardCount>=2?noteLabel(heard):'—')+'</b>';
+
+  if(!playing||mode!=='learn') { hold=0; aHist.length=0; return; }
+  const ev=events[nextIdx]; if(!ev) return;
+  if(aHistIdx!==nextIdx){ aHist.length=0; aHistIdx=nextIdx; }
+  const ms=ev.notes.map(n=>n.midi); let allOk=true, sumA=0;
+  for(const n of ev.notes){ const r=noteHeard(n.midi,ms); if(!r.ok) allOk=false; sumA+=r.a; }
+  let mn=Infinity; for(const h of aHist){ const age=now-h.t; if(age>50&&age<400&&h.a<mn) mn=h.a; }
+  const targetRise=mn<Infinity&&sumA>=1.45*mn;            // la note vient d'être (re)frappée
+  const onsetAfter=lastOnset>lastAcc.time+50;              // attaque détectée depuis la dernière note validée
+  aHist.push({t:now,a:sumA}); while(aHist[0].t<now-500) aHist.shift();
+  if(ev.start-t<=EARLY&&ev.notes.some(n=>bandRise(midiFreq(n.midi)))) riseAt=now;
+  const riseOK=riseAt>lastAcc.time+40;
+  if(ev.start-t>EARLY) { hold=0; return; }
+  if(allOk) hold++; else hold=0;
+  if(hold>=2&&(riseOK||lastAcc.time<0)) accept(ev,now);
+}
+function accept(ev,now){
+  ev.done=true; ev.notes.forEach(n=>n.done=true); lastAcc={midi:ev.notes[0].midi,time:performance.now()}; hold=0;
+  const late=waiting&&(performance.now()-waitSince>700);
+  stats.total++; if(!late) stats.ontime++;
+  waiting=false; advance();
+}
+function advance(){ while(events[nextIdx]&&events[nextIdx].done) nextIdx++; }
+
+/* entrée écran / clavier */
+function screenInput(midi){
+  pressed[midi]=performance.now();
+  synth(midi,0.6);
+  if(playing&&mode==='learn'){
+    const ev=events[nextIdx];
+    if(ev&&ev.start-t<=EARLY&&ev.notes.some(n=>n.midi===midi)){
+      ev.clicked[midi]=performance.now();
+      if(ev.notes.every(n=>performance.now()-(ev.clicked[n.midi]||-1e9)<2500)) accept(ev,performance.now());
+    }
+  }
+}
+function skipNote(){
+  if(!playing||mode!=='learn') return; const ev=events[nextIdx]; if(!ev) return;
+  ev.done=true; ev.notes.forEach(n=>n.done=true); stats.total++; stats.skipped++; waiting=false; advance();
+}
+
+/* ---------- Jeu ---------- */
+function loadSong(s){
+  song=s; notes=songNotes(s).map(n=>({...n,done:false})); events=makeEvents(notes); nextIdx=0; demoIdx=0; buildHands();
+  t=-2; playing=false; waiting=false; stats={total:0,ontime:0,skipped:0}; lastAcc={midi:-1,time:-1};
+  $('songTitle').innerHTML=s.title+' <small>— '+s.by+'</small>';
+  $('btnPlay').textContent='▶ Jouer'; $('result').classList.add('hidden');
+  $('handsSeg').style.display=s.lh?'':'none';
+}
+function restart(){ loadSong(song); }
+async function togglePlay(){
+  $('menu').classList.add('hidden'); $('result').classList.add('hidden');
+  if(!playing){
+    ensureCtx();
+    if(mode==='learn'&&!micOn) await startMic();
+    if(t>=song.end+1) restart();
+    playing=true; $('btnPlay').textContent='⏸ Pause';
+  } else { playing=false; $('btnPlay').textContent='▶ Jouer'; }
+}
+function setMode(m){
+  mode=m; $('mLearn').classList.toggle('on',m==='learn'); $('mListen').classList.toggle('on',m==='listen');
+  $('btnSkip').style.display=m==='learn'?'':'none'; restart();
+}
+function finish(){
+  playing=false; $('btnPlay').textContent='▶ Jouer';
+  if(mode!=='learn'){ return; }
+  const pct=stats.total?Math.round(100*stats.ontime/stats.total):0;
+  $('stars').textContent=pct>=85?'★★★':pct>=55?'★★☆':'★☆☆';
+  $('resTitle').textContent='Bravo ! '+song.title+' terminé';
+  $('resTxt').textContent=stats.ontime+' notes sur '+stats.total+' jouées sans te faire attendre ('+pct+' %)'+(stats.skipped?' · '+stats.skipped+' passée(s)':'')+'.';
+  $('result').classList.remove('hidden');
+}
+
+function update(dt,now){
+  processAudio(now);
+  if(!playing) return;
+  const step=dt*song.bpm*speed/60;
+  if(mode==='learn'){
+    const n=events[nextIdx];
+    if(n&&t+step>=n.start){
+      if(!waiting){ waiting=true; waitSince=now; }
+      t=Math.max(t,n.start);
+    } else { t+=step; waiting=false; }
+  } else {
+    t+=step;
+    while(demoIdx<notes.length&&notes[demoIdx].start<=t){
+      const n=notes[demoIdx++]; synth(n.midi,n.dur*60/(song.bpm*speed)); n.done=true;
+    }
+  }
+  if(t>song.end+1 && (mode==='listen'||nextIdx>=events.length)) finish();
+}
+
+/* ---------- Mains animées ---------- */
+const WOFF=[0,0.5,1,1.5,2,3,3.5,4,4.5,5,5.5,6];
+const wpos=m=>(Math.floor(m/12)-3)*7+WOFF[m%12];       // position en touches blanches depuis Do2 (noires = +0,5)
+const FCOL=['','#2fbf71','#f5c518','#7b4dff','#2f86ff','#ff5c8a'];
+let handStyle='real', showHands=true, lastDt=0.016; let handTrack={R:[],L:[]}; const handDisp={R:{x:null},L:{x:null}};
+function buildHands(){
+  handTrack={R:[],L:[]}; handDisp.R.x=null; handDisp.L.x=null;
+  for(const h of ['R','L']){
+    let base=null;
+    for(const ev of events){
+      const ns=ev.notes.filter(n=>(n.hand||'R')===h).sort((a,b)=>a.midi-b.midi); if(!ns.length) continue;
+      const ps=ns.map(n=>wpos(n.midi)), lo=ps[0], hi=ps[ps.length-1]; let fingers, cx;
+      if(ns.length>1&&hi-lo>4.3){
+        const L=Math.min(ns.length,5);
+        const lst=h==='R'?{2:[1,5],3:[1,3,5],4:[1,2,3,5],5:[1,2,3,4,5]}:{2:[5,1],3:[5,3,1],4:[5,4,2,1],5:[5,4,3,2,1]};
+        fingers=ns.map((n,i)=>(lst[L]||lst[5])[Math.min(i,L-1)]); cx=(lo+hi)/2; base=lo;
+      } else {
+        if(base==null||lo<base-0.01||hi>base+4.01) base=(base!=null&&hi>base+4.01)?hi-4:lo;
+        fingers=ps.map(p=>Math.min(5,Math.max(1,h==='R'?Math.round(p-base)+1:5-Math.round(p-base)))); cx=base+2;
+      }
+      handTrack[h].push({start:ev.start,cx,assign:ns.map((n,i)=>({note:n,finger:fingers[i],pos:ps[i]}))});
+    }
+  }
+}
+const FSAT=['','#1c9e60','#f0bf00','#6a3bff','#2f86f0','#ff4766'], FPAS=['','#8fe3b3','#f8dd80','#b7a3ff','#8fd3f8','#ffa3b5'], INK='#1b1b24';
+function drawFinger(bx,by,tx,ty,w,j,bow){
+  const mx=(bx+tx)/2+(bow||0), my=(by+ty)/2-kbH*0.012, w2=w*0.9, o=Math.max(2.4,w*0.1);
+  g.lineCap='round'; g.lineJoin='round'; g.strokeStyle=INK;
+  g.lineWidth=w+o*2; g.beginPath(); g.moveTo(bx,by); g.lineTo(mx,my); g.stroke();
+  g.lineWidth=w2+o*2; g.beginPath(); g.moveTo(mx,my); g.lineTo(tx,ty); g.stroke();
+  g.strokeStyle=FSAT[j]; g.lineWidth=w2; g.beginPath(); g.moveTo(mx,my); g.lineTo(tx,ty); g.stroke();
+  g.strokeStyle=FPAS[j]; g.lineWidth=w*0.96; g.beginPath(); g.moveTo(bx,by); g.lineTo(mx,my); g.stroke();
+  // reflet sur le bout du doigt
+  const dx=tx-mx, dy=ty-my, l=Math.hypot(dx,dy)||1;
+  g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=Math.max(2,w2*0.16); g.beginPath();
+  g.moveTo(tx-dx/l*w2*0.2-w2*0.2,ty-dy/l*w2*0.2+w2*0.1); g.lineTo(mx+dx*0.35-w2*0.2,my+dy*0.35); g.stroke();
+}
+function drawHandColor(h,now){
+  const tr=handTrack[h]; if(!tr.length) return;
+  let pi=-1; while(pi+1<tr.length&&tr[pi+1].start<=t+1e-6) pi++;
+  const prev=pi>=0?tr[pi]:null, next=pi+1<tr.length?tr[pi+1]:null;
+  const near=next&&next.start-t<1.5, approach=near?Math.min(1,1-(next.start-t)/1.5):0;
+  const target=near?next.cx:(prev?prev.cx:next.cx), hd=handDisp[h];
+  if(hd.x==null) hd.x=target; hd.x+=(target-hd.x)*Math.min(1,lastDt*9);
+  const cx=hd.x, press={};
+  if(prev) for(const a of prev.assign) if(a.note.done&&t>=a.note.start&&t<a.note.start+a.note.dur) press[a.finger]=a.pos;
+  const nextF={}; if(near) for(const a of next.assign) nextF[a.finger]=a;
+  const fw=Math.max(9,ww*0.70), ts=h==='R'?-1:1;                    // ts : côté du pouce
+  const palmTop=kbBottom-kbH*0.33, TIP=[0,0.46,0.66,0.72,0.65,0.50], KN=[0,0,0.05,0.0,0.04,0.11];
+  const fingers=[];
+  for(let j=1;j<=5;j++){
+    const def=h==='R'?cx+(j-3)*1.0:cx+(3-j)*1.0; let pos=def, y=kbBottom-kbH*TIP[j], active=false, pr=false;
+    if(nextF[j]){ pos=def+(nextF[j].pos-def)*Math.min(1,approach*1.8); y-=kbH*0.04*approach; active=true; }
+    if(press[j]!=null){ pos=press[j]; y+=kbH*0.05; pr=true; }
+    let tx=(pos+0.5)*ww; if(j===1) tx+=ts*ww*0.3; if(j===5) tx-=ts*ww*0.15;
+    const bx=(def+0.5)*ww;
+    fingers.push({j,tx,ty:y,bx,by:palmTop+kbH*KN[j]+fw*0.55,w:fw*(j===1?1.12:j===5?0.84:j===3?1.0:0.95),active,pr});
+  }
+  const f2=fingers[1], f5=fingers[4], f1=fingers[0];
+  const edgeT=f2.bx+ts*fw*0.55, edgeP=f5.bx-ts*fw*0.48, mid=(edgeT+edgeP)/2, Wp=Math.abs(edgeT-edgeP);
+  const wristT=mid+ts*Wp*0.33, wristP=mid-ts*Wp*0.30, yB=H+60;
+  g.save();
+  // pouce : part du bas du côté de la paume, légèrement courbé vers l'extérieur
+  { const bxT=edgeT-ts*fw*0.15, byT=palmTop+kbH*0.30; drawFinger(bxT,byT,f1.tx,f1.ty,f1.w,1,ts*fw*0.35); }
+  for(const j of [5,4,2,3]){ const f=fingers[j-1]; drawFinger(f.bx,f.by,f.tx,f.ty,f.w,j,0); }
+  // paume : bord supérieur arrondi, renflement du pouce, rétrécissement vers le poignet
+  const yI=f2.by, yP=f5.by, yTop=palmTop-fw*0.15;
+  const palm=()=>{ g.beginPath();
+    g.moveTo(edgeP,yP+fw*0.2);
+    g.bezierCurveTo(edgeP,yTop+kbH*0.0,fingers[2].bx+ts*fw*0.2,yTop-fw*0.55,edgeT,yI+fw*0.1);
+    g.bezierCurveTo(edgeT+ts*fw*0.15,palmTop+kbH*0.20,edgeT+ts*fw*0.55,palmTop+kbH*0.38,wristT,yB);
+    g.lineTo(wristP,yB);
+    g.bezierCurveTo(wristP-ts*fw*0.1,palmTop+kbH*0.5,edgeP+ts*fw*0.05,palmTop+kbH*0.25,edgeP,yP+fw*0.2);
+    g.closePath(); };
+  palm(); g.strokeStyle=INK; g.lineWidth=Math.max(5,fw*0.22); g.lineJoin='round'; g.stroke();
+  palm(); const pg=g.createLinearGradient(0,palmTop,0,kbBottom); pg.addColorStop(0,'#ffffff'); pg.addColorStop(1,'#eef0f6'); g.fillStyle=pg; g.fill();
+  // plis de la paume
+  g.strokeStyle='rgba(120,125,150,.35)'; g.lineWidth=Math.max(1.5,fw*0.07); g.lineCap='round';
+  g.beginPath(); g.moveTo(edgeP-ts*fw*0.05,palmTop+kbH*0.16); g.quadraticCurveTo(mid,palmTop+kbH*0.13,edgeT+ts*fw*0.1,palmTop+kbH*0.28); g.stroke();
+  g.beginPath(); g.moveTo(edgeT-ts*fw*0.05,palmTop+kbH*0.2); g.quadraticCurveTo(mid+ts*fw*0.4,palmTop+kbH*0.34,mid+ts*fw*0.1,palmTop+kbH*0.5); g.stroke();
+  g.restore();
+  // pastille avec le numéro du doigt
+  for(const f of fingers){ if(!f.active) continue;
+    const r=Math.max(11,ww*0.5), bx=f.tx, by=f.ty-f.w*0.5-r-3;
+    g.fillStyle=FSAT[f.j]; g.beginPath(); g.arc(bx,by,r,0,7); g.fill();
+    g.strokeStyle='#fff'; g.lineWidth=Math.max(2,r*0.16); g.stroke();
+    g.fillStyle='#fff'; g.font='800 '+Math.round(r*1.2)+'px system-ui,sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(String(f.j),bx,by+1);
+  }
+}
+/* ----- main réaliste (peau, doigts effilés, ongles) ----- */
+const SKIN='#efbf9a', SKIN_L='#f7d6bb', SKIN_D='#d99a76', OUTL='#8a5238';
+function handState(h){
+  const tr=handTrack[h]; if(!tr.length) return null;
+  let pi=-1; while(pi+1<tr.length&&tr[pi+1].start<=t+1e-6) pi++;
+  const prev=pi>=0?tr[pi]:null, next=pi+1<tr.length?tr[pi+1]:null;
+  const near=next&&next.start-t<1.5, approach=near?Math.min(1,1-(next.start-t)/1.5):0;
+  const target=near?next.cx:(prev?prev.cx:next.cx), hd=handDisp[h];
+  if(hd.x==null) hd.x=target; hd.x+=(target-hd.x)*Math.min(1,lastDt*9);
+  const cx=hd.x, press={};
+  if(prev) for(const a of prev.assign) if(a.note.done&&t>=a.note.start&&t<a.note.start+a.note.dur) press[a.finger]=a.pos;
+  const nextF={}; if(near) for(const a of next.assign) nextF[a.finger]=a;
+  const fw=Math.max(9,ww*0.70), ts=h==='R'?-1:1;
+  const palmTop=kbBottom-kbH*0.33, TIP=[0,0.46,0.66,0.72,0.65,0.50], KN=[0,0,0.05,0.0,0.04,0.11];
+  const fingers=[];
+  for(let j=1;j<=5;j++){
+    const def=h==='R'?cx+(j-3)*1.0:cx+(3-j)*1.0; let pos=def, y=kbBottom-kbH*TIP[j], active=false, pr=false;
+    if(nextF[j]){ pos=def+(nextF[j].pos-def)*Math.min(1,approach*1.8); y-=kbH*0.04*approach; active=true; }
+    if(press[j]!=null){ pos=press[j]; y+=kbH*0.05; pr=true; }
+    let tx=(pos+0.5)*ww; if(j===1) tx+=ts*ww*0.3; if(j===5) tx-=ts*ww*0.15;
+    fingers.push({j,tx,ty:y,bx:(def+0.5)*ww,by:palmTop+kbH*KN[j]+fw*0.55,w:fw*(j===1?1.12:j===5?0.84:j===3?1.0:0.95),active,pr});
+  }
+  const f2=fingers[1], f5=fingers[4];
+  const edgeT=f2.bx+ts*fw*0.55, edgeP=f5.bx-ts*fw*0.48, mid=(edgeT+edgeP)/2, Wp=Math.abs(edgeT-edgeP);
+  return {fingers,ts,fw,palmTop,edgeT,edgeP,mid,Wp,wristT:mid+ts*Wp*0.33,wristP:mid-ts*Wp*0.30,yB:H+60,yI:f2.by,yP:f5.by,yTop:palmTop-fw*0.15};
+}
+function drawBadges(fingers){
+  for(const f of fingers){ if(!f.active) continue;
+    const r=Math.max(11,ww*0.5), bx=f.tx, by=f.ty-f.w*0.5-r-3;
+    g.fillStyle=FSAT[f.j]; g.beginPath(); g.arc(bx,by,r,0,7); g.fill();
+    g.strokeStyle='#fff'; g.lineWidth=Math.max(2,r*0.16); g.stroke();
+    g.fillStyle='#fff'; g.font='800 '+Math.round(r*1.2)+'px system-ui,sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(String(f.j),bx,by+1);
+  }
+}
+function fingerGeom(bx,by,tx,ty,w,bow){
+  const dx=tx-bx, dy=ty-by, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L, nx=-uy, ny=ux;
+  const P=[[bx,by],[bx+dx*0.40+nx*bow,by+dy*0.40+ny*bow],[bx+dx*0.72+nx*bow*0.9,by+dy*0.72+ny*bow*0.9],[tx,ty]];
+  const WS=[w*1.02,w*0.98,w*0.88,w*0.76];
+  // normales moyennées
+  const N=P.map((q,i)=>{ const a=P[Math.max(0,i-1)], b=P[Math.min(3,i+1)]; const ex=b[0]-a[0], ey=b[1]-a[1], l=Math.hypot(ex,ey)||1; return [-ey/l,ex/l]; });
+  return {P,WS,N,ux,uy};
+}
+function fingerPath(G){
+  const {P,WS,N}=G, p=new Path2D(), Lf=i=>[P[i][0]+N[i][0]*WS[i]/2,P[i][1]+N[i][1]*WS[i]/2], Rt=i=>[P[i][0]-N[i][0]*WS[i]/2,P[i][1]-N[i][1]*WS[i]/2];
+  const mp=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+  let l=[0,1,2,3].map(Lf), r=[0,1,2,3].map(Rt);
+  p.moveTo(l[0][0],l[0][1]); p.quadraticCurveTo(l[1][0],l[1][1],mp(l[1],l[2])[0],mp(l[1],l[2])[1]); p.quadraticCurveTo(l[2][0],l[2][1],l[3][0],l[3][1]);
+  const ang=Math.atan2(G.uy,G.ux); p.arc(P[3][0],P[3][1],WS[3]/2,ang+Math.PI/2,ang-Math.PI/2,true);
+  p.quadraticCurveTo(r[2][0],r[2][1],mp(r[1],r[2])[0],mp(r[1],r[2])[1]); p.quadraticCurveTo(r[1][0],r[1][1],r[0][0],r[0][1]); p.closePath();
+  return p;
+}
+function drawHandReal(h,now){
+  const S=handState(h); if(!S) return;
+  const {fingers,ts,fw,palmTop,edgeT,edgeP,mid,wristT,wristP,yB,yI,yP,yTop}=S;
+  const f1=fingers[0], o=Math.max(1.6,fw*0.07);
+  const parts=[]; 
+  const thumb=fingerGeom(edgeT-ts*fw*0.15,palmTop+kbH*0.31,f1.tx,f1.ty,f1.w,ts*fw*0.4); parts.push({G:thumb,f:f1});
+  for(const j of [2,3,4,5]){ const f=fingers[j-1]; parts.push({G:fingerGeom(f.bx,f.by-fw*0.1,f.tx,f.ty,f.w,0),f}); }
+  const palm=new Path2D();
+  palm.moveTo(edgeP,yP+fw*0.2);
+  palm.bezierCurveTo(edgeP,yTop,fingers[2].bx+ts*fw*0.2,yTop-fw*0.55,edgeT,yI+fw*0.1);
+  palm.bezierCurveTo(edgeT+ts*fw*0.15,palmTop+kbH*0.20,edgeT+ts*fw*0.55,palmTop+kbH*0.38,wristT,yB);
+  palm.lineTo(wristP,yB);
+  palm.bezierCurveTo(wristP-ts*fw*0.1,palmTop+kbH*0.5,edgeP+ts*fw*0.05,palmTop+kbH*0.25,edgeP,yP+fw*0.2);
+  palm.closePath();
+  const paths=parts.map(x=>fingerPath(x.G)); paths.push(palm);
+  g.save(); g.lineJoin='round'; g.lineCap='round';
+  g.strokeStyle=OUTL; g.lineWidth=o*2; for(const pa of paths) g.stroke(pa);          // contour d'un seul tenant
+  const pg=g.createLinearGradient(0,palmTop,0,kbBottom); pg.addColorStop(0,SKIN_L); pg.addColorStop(1,SKIN);
+  g.fillStyle=pg; g.fill(palm);
+  for(const x of parts){ g.fillStyle=SKIN; g.fill(fingerPath(x.G)); }
+  // détails : reflet, plis, ongles
+  for(const x of parts){
+    const {P,WS,N,ux,uy}=x.G, f=x.f;
+    g.strokeStyle='rgba(255,255,255,.28)'; g.lineWidth=Math.max(2,WS[0]*0.16);
+    g.beginPath(); g.moveTo(P[0][0]-N[0][0]*WS[0]*0.18,P[0][1]-N[0][1]*WS[0]*0.18); g.lineTo(P[2][0]-N[2][0]*WS[2]*0.18,P[2][1]-N[2][1]*WS[2]*0.18); g.stroke();
+    g.strokeStyle='rgba(138,82,56,.55)'; g.lineWidth=Math.max(1.2,fw*0.05);
+    for(const i of [1,2]){ const q=P[i], w=WS[i]*0.34; g.beginPath(); g.moveTo(q[0]-N[i][0]*w,q[1]-N[i][1]*w);
+      g.quadraticCurveTo(q[0]-ux*w*0.5,q[1]-uy*w*0.5,q[0]+N[i][0]*w,q[1]+N[i][1]*w); g.stroke(); }
+    // ongle
+    const r=WS[3]/2, cx0=P[3][0]-ux*r*0.55, cy0=P[3][1]-uy*r*0.55;
+    g.save(); g.translate(cx0,cy0); g.rotate(Math.atan2(uy,ux));
+    g.fillStyle=FPAS[f.j]; g.beginPath(); g.ellipse(0,0,r*0.78,r*0.6,0,0,7); g.fill();
+    g.strokeStyle='rgba(138,82,56,.6)'; g.lineWidth=1.1; g.stroke();
+    g.fillStyle='rgba(255,255,255,.55)'; g.beginPath(); g.ellipse(-r*0.15,-r*0.2,r*0.28,r*0.12,0,0,7); g.fill(); g.restore();
+  }
+  // plis de la paume
+  g.strokeStyle='rgba(138,82,56,.4)'; g.lineWidth=Math.max(1.4,fw*0.06);
+  g.beginPath(); g.moveTo(edgeP-ts*fw*0.05,palmTop+kbH*0.16); g.quadraticCurveTo(mid,palmTop+kbH*0.13,edgeT+ts*fw*0.1,palmTop+kbH*0.28); g.stroke();
+  g.beginPath(); g.moveTo(edgeT-ts*fw*0.05,palmTop+kbH*0.2); g.quadraticCurveTo(mid+ts*fw*0.4,palmTop+kbH*0.34,mid+ts*fw*0.1,palmTop+kbH*0.5); g.stroke();
+  g.restore();
+  drawBadges(fingers);
+}
+function drawHand(h,now){ if(handStyle==='color') drawHandColor(h,now); else drawHandReal(h,now); }
+/* ---------- Dessin ---------- */
+const cv=$('stage'), g=cv.getContext('2d');
+let W=0,H=0,DPR=1,kbH=0,kbBottom=0,strip=0,hitY=0,ww=0,bw=0,bh=0,ppb=0; const KR={};
+function layout(){
+  const r=cv.parentElement.getBoundingClientRect(); DPR=window.devicePixelRatio||1; W=r.width; H=r.height;
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+  kbH=Math.max(120,Math.min(210,H*0.27)); strip=0; hitY=H-strip-kbH; kbBottom=hitY+kbH; ww=W/36; bw=ww*0.6; bh=kbH*0.62; ppb=hitY/5;
+  let wi=0;
+  for(let m=LOW;m<=HIGH;m++){
+    if(!isBlack(m)){ KR[m]={x:wi*ww,w:ww,black:false}; wi++; }
+    else KR[m]={x:wi*ww-bw/2,w:bw,black:true};
+  }
+}
+const col=(pc,a=1,l=58)=>`hsl(${(pc*30+205)%360} 85% ${l}% / ${a})`;
+function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+function fit(text,maxW,max){ let s=max; g.font=`700 ${s}px system-ui,sans-serif`; while(s>7&&g.measureText(text).width>maxW){s--; g.font=`700 ${s}px system-ui,sans-serif`;} }
+
+function draw(now){
+  g.setTransform(DPR,0,0,DPR,0,0);
+  const bgG=g.createLinearGradient(0,0,0,hitY); bgG.addColorStop(0,'#0b0d1c'); bgG.addColorStop(1,'#151938');
+  g.fillStyle=bgG; g.fillRect(0,0,W,H);
+  // lignes verticales (octaves plus marquées)
+  for(let m=LOW;m<=HIGH;m++){ if(isBlack(m)) continue; const k=KR[m];
+    g.fillStyle=m%12===0?'rgba(140,150,255,.28)':'rgba(140,150,255,.07)'; g.fillRect(k.x,0,1,hitY); }
+  // lignes de temps
+  const b0=Math.floor(t), b1=Math.ceil(t+hitY/ppb);
+  for(let b=Math.max(0,b0);b<=b1;b++){ const y=hitY-(b-t)*ppb; const bar=Math.abs(b/song.bar-Math.round(b/song.bar))<1e-6;
+    g.fillStyle=bar?'rgba(160,170,255,.22)':'rgba(160,170,255,.07)'; g.fillRect(0,y,W,1); }
+
+    // notes qui tombent
+  g.save(); g.beginPath(); g.rect(0,0,W,hitY); g.clip();
+  for(let i=0;i<notes.length;i++){
+    const n=notes[i], k=KR[n.midi]; if(!k) continue;
+    const y2=hitY-(n.start-t)*ppb, y1=y2-n.dur*ppb+3;
+    if(y1>hitY||y2<0) continue;
+    const pc=n.midi%12, isT=(events[nextIdx]&&events[nextIdx].notes.includes(n));
+    const px=k.x+(k.black?1:2), pw=k.w-(k.black?2:4);
+    const act=n.done&&t>=n.start&&t<n.start+n.dur;
+    let fill=col(pc,n.done&&!act?0.45:1,act?72:58);
+    if(act||(isT&&waiting)){ g.shadowColor=col(pc,1,65); g.shadowBlur=18; }
+    g.fillStyle=fill; rr(px,y1,pw,y2-y1,5); g.fill(); g.shadowBlur=0;
+    if(k.black||n.hand==='L'){ g.strokeStyle=n.hand==='L'?'rgba(255,255,255,.95)':'rgba(255,255,255,.85)'; g.lineWidth=n.hand==='L'?2:1.5; if(n.hand==='L') g.setLineDash([5,3]); rr(px,y1,pw,y2-y1,5); g.stroke(); g.setLineDash([]); }
+    if(y2-y1>=13){
+      const txt=NAMES[pc]; fit(txt,pw-3,13); g.fillStyle='#0b0d1c'; g.textAlign='center'; g.textBaseline='middle';
+      g.fillText(txt,px+pw/2,y2-Math.min(10,(y2-y1)/2));
+    }
+  }
+  g.restore();
+  // ligne de frappe
+  g.fillStyle='rgba(255,255,255,.55)'; g.fillRect(0,hitY-1,W,2);
+
+  // état des touches
+  const lit={};
+  for(const n of notes){ if(n.done&&t>=n.start&&t<n.start+n.dur) lit[n.midi]=1; }
+  for(const m in pressed){ if(now-pressed[m]<350) lit[m]=1; }
+  const hint={};
+  for(let i=nextIdx;i<events.length;i++){ const e=events[i]; if(e.start-t>2) break; for(const n of e.notes) hint[n.midi]=Math.max(hint[n.midi]||0,i===nextIdx?(waiting?1:0.8):0.4); }
+  const pulse=0.75+0.25*Math.sin(now/130);
+
+  g.fillStyle='#0c0e1d'; g.fillRect(0,kbBottom,W,H-kbBottom);
+  // clavier : blanches
+  for(let m=LOW;m<=HIGH;m++){ if(isBlack(m)) continue; const k=KR[m], pc=m%12;
+    const gr=g.createLinearGradient(0,hitY,0,kbBottom); gr.addColorStop(0,'#fbfbff'); gr.addColorStop(1,'#d5d7e6');
+    g.fillStyle=gr; g.fillRect(k.x,hitY,k.w,kbH);
+    if(lit[m]){ g.fillStyle=col(pc,0.95,62); g.fillRect(k.x,hitY,k.w,kbH); }
+    else if(hint[m]){ g.fillStyle=col(pc,(hint[m]===1?pulse:hint[m])*0.8,62); g.fillRect(k.x,hitY,k.w,kbH); }
+    g.strokeStyle='#8c8fa8'; g.lineWidth=1; g.strokeRect(k.x+.5,hitY+.5,k.w-1,kbH-1);
+  }
+  // noires
+  for(let m=LOW;m<=HIGH;m++){ if(!isBlack(m)) continue; const k=KR[m], pc=m%12;
+    const gr=g.createLinearGradient(0,hitY,0,hitY+bh); gr.addColorStop(0,'#3a3c4e'); gr.addColorStop(1,'#14151f');
+    g.fillStyle=gr; rr(k.x,hitY-1,k.w,bh+1,3); g.fill();
+    if(lit[m]){ g.fillStyle=col(pc,0.95,60); rr(k.x,hitY-1,k.w,bh+1,3); g.fill(); }
+    else if(hint[m]){ g.fillStyle=col(pc,(hint[m]===1?pulse:hint[m])*0.85,55); rr(k.x,hitY-1,k.w,bh+1,3); g.fill(); }
+    g.strokeStyle='#000'; g.lineWidth=1; rr(k.x,hitY-1,k.w,bh+1,3); g.stroke();
+  }
+  // noms des touches (au-dessus des doigts)
+  for(let m=LOW;m<=HIGH;m++){ if(isBlack(m)) continue; const k=KR[m], pc=m%12;
+    const label=NAMES[pc]+(pc===0?(Math.floor(m/12)-1):'');
+    fit(label,k.w-2,Math.min(12,ww*0.4)); g.textAlign='center'; g.textBaseline='alphabetic';
+        g.fillStyle=(lit[m]||hint[m])?'#10122a':'#5a5d78'; g.fillText(label,k.x+k.w/2,kbBottom-8);
+    if(m===60){ g.fillStyle='#6c8cff'; g.beginPath(); g.arc(k.x+k.w/2,kbBottom-28,3,0,7); g.fill(); }
+  }
+  // mains
+  if(showHands){ drawHand('L',now); drawHand('R',now); }
+  // marqueur "j'entends"
+  if(heard!=null&&heardCount>=2&&KR[heard]){
+    const k=KR[heard], ok=events[nextIdx]&&events[nextIdx].notes.some(n=>n.midi===heard);
+    g.fillStyle=ok?'#38e08c':'#ff5d73'; g.beginPath(); const cx=k.x+k.w/2;
+    g.moveTo(cx-6,hitY-14); g.lineTo(cx+6,hitY-14); g.lineTo(cx,hitY-3); g.closePath(); g.fill();
+  }
+  // bannière
+  g.textAlign='center'; g.textBaseline='middle';
+  const nt=events[nextIdx];
+  if(playing&&mode==='learn'&&waiting&&nt){
+    const txt='Joue : '+nt.notes.map(n=>NAMES[n.midi%12]+(Math.floor(n.midi/12)-1)).join(' + ');
+    g.font='700 22px system-ui,sans-serif'; const w=g.measureText(txt).width+34;
+    g.fillStyle='rgba(13,15,30,.85)'; rr(W/2-w/2,12,w,40,20); g.fill();
+    g.strokeStyle=col(nt.notes[0].midi%12,1,62); g.lineWidth=2; rr(W/2-w/2,12,w,40,20); g.stroke();
+    g.fillStyle='#fff'; g.fillText(txt,W/2,33);
+  } else if(playing&&t<0){
+    g.font='700 28px system-ui,sans-serif'; g.fillStyle='rgba(238,240,255,.85)'; g.fillText('Prépare-toi…',W/2,hitY/2);
+  }
+  // progression
+  g.fillStyle='rgba(108,140,255,.9)'; g.fillRect(0,0,W*Math.max(0,Math.min(1,t/song.end)),3);
+}
+let last=performance.now();
+function frame(now){ const dt=Math.min(0.1,(now-last)/1000); last=now; lastDt=dt; update(dt,now); draw(now); requestAnimationFrame(frame); }
+
+/* ---------- Interface ---------- */
+function buildMenu(){
+  const grid=$('songGrid'); grid.innerHTML='';
+  SONGS.forEach(s=>{
+    const b=document.createElement('button'); b.className='card';
+    b.innerHTML=`<h3>${s.title}</h3><div class="by">${s.by}</div><span class="tag ${s.level}">${s.level}</span>`;
+    b.onclick=()=>{ loadSong(s); $('menu').classList.add('hidden'); };
+    grid.appendChild(b);
+  });
+}
+$('btnSongs').onclick=()=>{ playing=false; $('btnPlay').textContent='▶ Jouer'; $('menu').classList.remove('hidden'); };
+$('btnPlay').onclick=e=>{ togglePlay(); e.target.blur(); };
+$('btnRestart').onclick=e=>{ restart(); e.target.blur(); };
+$('btnSkip').onclick=e=>{ skipNote(); e.target.blur(); };
+for(const [id,h] of [['hR','R'],['hL','L'],['hB','B']]) $(id).onclick=e=>{ hands=h; for(const [i2,h2] of [['hR','R'],['hL','L'],['hB','B']]) $(i2).classList.toggle('on',h2===h); restart(); e.target.blur(); };
+$('mLearn').onclick=e=>{ setMode('learn'); e.target.blur(); };
+$('mListen').onclick=e=>{ setMode('listen'); e.target.blur(); };
+$('btnAgain').onclick=()=>{ restart(); togglePlay(); };
+$('btnOther').onclick=()=>{ $('result').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+$('spd').oninput=()=>{ speed=parseFloat($('spd').value); $('spdV').textContent=Math.round(speed*100)+'%'; saveSettings(); };
+$('sens').oninput=saveSettings;
+$('handSel').onchange=e=>{ const v=e.target.value; showHands=v!=='off'; if(showHands) handStyle=v; e.target.blur(); try{ localStorage.setItem('pc_hand',v); }catch(x){} };
+try{ const v=localStorage.getItem('pc_hand'); if(v){ $('handSel').value=v; showHands=v!=='off'; if(showHands) handStyle=v; } }catch(x){}
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.code==='Space'){ e.preventDefault(); togglePlay(); }
+  else if(e.code==='ArrowRight'||e.code==='Enter'){ e.preventDefault(); skipNote(); }
+  else if(e.key==='r'||e.key==='R'){ restart(); }
+});
+cv.addEventListener('pointerdown',e=>{
+  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top; if(y<hitY) return;
+  let hit=null; if(y>kbBottom) return;
+  for(let m=LOW;m<=HIGH&&!hit;m++){ if(!isBlack(m)) continue; const k=KR[m]; if(x>=k.x&&x<=k.x+k.w&&y<=hitY+bh) hit=m; }
+  if(hit==null){ const idx=Math.floor(x/ww); let c=0; for(let m=LOW;m<=HIGH;m++){ if(isBlack(m)) continue; if(c===idx){hit=m;break;} c++; } }
+  if(hit!=null) screenInput(hit);
+});
+addEventListener('resize',layout);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&playing) togglePlay(); });
+
+speed=parseFloat($('spd').value); $('spdV').textContent=Math.round(speed*100)+'%';
+layout(); buildMenu(); loadSong(SONGS[SONGS.length-1]); $('menu').classList.remove('hidden');
+try{ ensureCtx(); }catch(e){}
+requestAnimationFrame(frame);
+
+/* petit hook de test (bouclage du synthé vers l'analyseur) */
+window.__piano={
+  loopback(){ ensureCtx(); loopback=true; micOn=true; setMicUI(); },
+  synth, get state(){ return {t,nextIdx,waiting,playing,total:events.length,heard,stats}; },
+  noteHeard:m=>{ procStamp++; analyser.getFloatTimeDomainData(tmp); return noteHeard(m).ok; },
+  tick(dt){ update(dt,performance.now()); },
+  get pianoReady(){ return !!pianoSamples; },
+  songs:SONGS, loadSong, togglePlay
+};
+</script>
+</body>
+</html>
